@@ -30,19 +30,13 @@ Sistema de gestión empresarial (ERP) con módulos de caja, contabilidad, cuenta
 - Sufijos técnicos y patrones: **convención estándar en inglés** (`Repository`, `Service`, `Controller`, `DTO`, `Mapper`)
 - Comentarios, mensajes de error y logs: **español**
 
-## MÓDULO DE REFERENCIA
-
-Utiliza el módulo `caja` como referencia canónica de estructura, estilo y convenciones. 
-Antes de replicar una decisión, verifica que sea compatible con los requerimientos del módulo nuevo.
-Si fuera necesario desviarse de la referencia, explica y justifica la diferencia antes de implementarla.
-
 ## FORMA DE RESPONDER
 
 Siempre:
 
 - Explica brevemente la solución antes de generar código completo y funcional
 - No omitas imports, no uses pseudocódigo
-- Mantén consistencia entre frontend y backend
+- El frontend es un proyecto **React separado** que consume esta API; este proyecto **no genera frontend**. Mantén el backend coherente con el contrato que consumirá el frontend: `RespuestaApi`, paginación estándar, seguridad Bearer + refresh y CORS.
 - Indica estructura de carpetas cuando sea necesario
 - Sugiere mejores prácticas si detectas mejoras posibles
 
@@ -57,6 +51,7 @@ Cuando existan múltiples alternativas:
 - Señalar las decisiones de diseño tomadas y las alternativas descartadas
 - No modifiques archivos o módulos ajenos a la solicitud.
 - Antes de crear componentes nuevos, revisa la estructura y las convenciones existentes.
+- Si el proyecto aún no contiene una estructura aplicable, propón primero la arquitectura base y solicita confirmación antes de generar una implementación extensa
 
 ## BACKEND - ENTORNO
 
@@ -79,7 +74,7 @@ Cuando existan múltiples alternativas:
 
 Cuando el alcance funcional del módulo lo requiera, generar:
 
-- Entidades (*entities*) que hereden de `EntidadAuditable`.
+- Entidades (*entities*) que hereden de `EntidadAuditable` (ver AUDITORÍA Y BORRADO LÓGICO para las excepciones).
 - DTO.
 - Repositorios (*repositories*).
 - Servicios (*services*).
@@ -100,7 +95,8 @@ Reglas:
 - Nunca utilices `record` para entidades JPA, servicios, repositorios, controladores, componentes CDI ni clases que requieran estado mutable.
 - Verifica la compatibilidad del `record` con Jakarta Bean Validation, JSON-B y MapStruct antes de utilizarlo.
 - Los nombres de los atributos deben ser iguales que los nombres de las columnas de la base de datos en formato camelCase
-  ejemplos: caja_id=cajaId, descri=descri, estado_docu_elec = estadoDocuElec
+  ejemplos: caja_id=cajaId, descri=descri, estado_docu_elec=estadoDocuElec, usuari_regi=usuariRegi, fecha_hora_regi=fechaHoraRegi
+- Esta regla incluye los campos de auditoría heredados de `EntidadAuditable`, cuyos nombres ya coinciden con sus columnas, por lo que no requieren mapeo `@Column` adicional (ver AUDITORÍA Y BORRADO LÓGICO).
 
 ### Contrato de respuesta JSON
 
@@ -141,8 +137,12 @@ Reglas:
 
 ## AUDITORÍA Y BORRADO LÓGICO
 
-- Toda entidad auditable debe heredar de `EntidadAuditable`, clase anotada con `@MappedSuperclass`, con: `creadoPor`, `fechaCrea`, `modifiPor`, `fechaModi`, `estado`
-- **Borrado lógico por defecto** (campo `estado`); borrado físico solo cuando se justifique técnicamente
+- `EntidadAuditable` es una clase `@MappedSuperclass` que contiene **solo los cuatro campos de auditoría**: `usuariRegi`, `fechaHoraRegi`, `usuariModi`, `fechaHoraModi`. Sus nombres coinciden en camelCase con las columnas del DDL (`usuari_regi`, `fecha_hora_regi`, `usuari_modi`, `fecha_hora_modi`), por lo que no requieren mapeo `@Column` adicional.
+- Solo heredan de `EntidadAuditable` las entidades cuya tabla posee esas cuatro columnas (las transaccionales). Las tablas **maestras, de configuración y de detalle** que no las tienen **no heredan** de `EntidadAuditable`.
+- `estado` **no forma parte** de `EntidadAuditable`: no es uniforme (existe solo en algunas tablas y su tipo varía —`BOOL` en maestros y movimientos, `VARCHAR(30)` en comprobantes—). Se declara por entidad, con su tipo real, únicamente donde la columna exista.
+- **Borrado lógico por defecto** (campo `estado`) en las entidades que lo tengan; borrado físico solo cuando se justifique técnicamente.
+- Las tablas de detalle sin `estado` se gestionan por **composición del agregado** con `orphanRemoval` (borrado físico de la fila al quitarla del padre); es un caso válido de borrado físico justificado.
+- El DDL define el trigger `trg_marca_modificacion()` que administra las columnas `_modi` en cada `UPDATE` de las tablas transaccionales. La capa JPA no debe sobrescribir esa lógica: marca esas columnas como no gestionadas por la aplicación (p. ej. `updatable = false`) o refresca la entidad tras persistir.
 
 ## PAGINACIÓN ESTÁNDAR
 
@@ -200,17 +200,28 @@ Protege los endpoints por permiso y no únicamente por rol.
 
 ## CONVENCIONES
 
-- Paquetes por módulos:
-  - `com.saolan.caja`
-  - `com.saolan.contabilidad`
-  - `com.saolan.cuentasporcobrar`
-  - `com.saolan.cuentasporpagar`
-  - `com.saolan.egreso`
-  - `com.saolan.ingreso`
-  - `com.saolan.inventario`
-  - `com.saolan.parametro`
-  - `com.saolan.seguridad`
-  
+- Paquete raíz por módulo: `com.saolan.soem.<modulo>`
+  - `com.saolan.soem.compartido`
+  - `com.saolan.soem.configuracion`
+  - `com.saolan.soem.caja`
+  - `com.saolan.soem.contabilidad`
+  - `com.saolan.soem.cuentasporcobrar`
+  - `com.saolan.soem.cuentasporpagar`
+  - `com.saolan.soem.egreso`
+  - `com.saolan.soem.ingreso`
+  - `com.saolan.soem.inventario`
+  - `com.saolan.soem.seguridad`
+
+- Subpaquetes de capa dentro de cada módulo: `modelo`, `dto`, `repositorio`, `servicio`, `controlador`, `mapeador`
+  ejemplo: `com.saolan.soem.caja.modelo`, `com.saolan.soem.caja.servicio`, `com.saolan.soem.caja.controlador`
+
+- Paquete compartido transversal: `com.saolan.soem.comun`
+  - `comun.modelo` → `EntidadAuditable`
+  - `comun.dto` → `RespuestaApi`, `ErrorCampo`, `Paginacion`, `ParametrosBusqueda`, `ComboDTO`
+  - `comun.excepcion` → excepciones de negocio y `ManejadorGlobalExcepciones`
+  - `comun.seguridad` → acciones de permiso, binding de autorización y filtro
+  - `comun.config` → CORS y `@ApplicationPath("/api/v1")`
+
 - Endpoints REST versionados: `/api/v1/[recurso]` (recursos en **plural**, **kebab-case**)
 
 Ejemplos:
@@ -222,6 +233,13 @@ POST   /api/v1/cuentas-por-cobrar
 PUT    /api/v1/cuentas-por-cobrar/{id}
 DELETE /api/v1/cuentas-por-cobrar/{id} el verbo DELETE ejecuta borrado lógico salvo indicación contraria
 ```
+
+### Combos (listas para selección)
+
+- Endpoint de solo lectura: `GET /api/v1/<recurso-plural-kebab-case>/combo`.
+- Devuelve los registros activos, **sin paginar**, proyectando solo `ComboDTO { valor, etiqueta }` mediante Criteria (no cargar la entidad completa).
+- Cada combo pertenece al **módulo dueño** de la tabla que lista, no al módulo que lo consume.
+- `ComboDTO` se comparte desde `com.saolan.soem.comun`.
 
 ## BASE DE DATOS
 
