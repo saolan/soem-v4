@@ -29,8 +29,7 @@
 
 			<!-- Traduce los nombres de atributo camelCase (sucursalId, usuariRegi)
 				 a las columnas snake_case reales del DDL (sucursal_id, usuari_regi),
-				 tal como exige AGENTS.md sin necesidad de anotar @Column en cada
-				 entidad. -->
+				 tal como exige AGENTS.md -->
 			<property name="hibernate.physical_naming_strategy"
 				value="org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy" />
 		</properties>
