@@ -10,15 +10,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Mapeo completo del catalogo externo CERT_EMIS (emisores de certificados de
- * firma electronica: los datos del certificado X.509 usados para firmar
- * comprobantes electronicos). CERT_EMIS queda fuera del agregado sucursal
- * (es un catalogo, no una tabla hija): este modulo solo lo consume desde
- * {@link SucuCertEmis} y expone su combo de solo lectura
- * ({@code GET /api/v1/certificados-emisor/combo}); no tiene alta, baja ni
- * modificacion propias en este CRUD. Si en el futuro se genera el CRUD
- * completo de "cert-emis", se suman repositorio/servicio/controlador sobre
- * esta misma entidad, que ya mapea todas las columnas de la tabla.
+ * Catalogo CERT_EMIS: emisores de certificados de firma electronica (datos
+ * del sujeto X.509 usados para firmar comprobantes electronicos). Agregado
+ * propio del modulo configuracion ({@code /api/v1/certificados-emisor}),
+ * sin columnas de auditoria y con borrado logico por {@code estado}. Lo
+ * referencia {@link SucuCertEmis}, que pertenece al agregado Sucursal.
  */
 @Entity
 @Table(name = "cert_emis")

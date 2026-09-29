@@ -64,3 +64,18 @@ asignacion_sucursal AS (
 INSERT INTO rol_perm (rol_id, permiso_id, acceso)
 SELECT nuevo_rol.rol_id, permiso.permiso_id, true
 FROM nuevo_rol, permiso;
+
+/*------------------------------------------------------------------------------
+  Resincronizacion de permisos (idempotente)
+  Correr este bloque solo, cada vez que una migracion nueva agregue permisos
+  (V6 en adelante), para que el rol de pruebas tambien los tenga.
+------------------------------------------------------------------------------*/
+INSERT INTO rol_perm (rol_id, permiso_id, acceso)
+SELECT rol.rol_id, permiso.permiso_id, true
+FROM rol
+CROSS JOIN permiso
+WHERE rol.descri = 'Administrador de pruebas'
+  AND NOT EXISTS (
+      SELECT 1 FROM rol_perm existente
+      WHERE existente.rol_id = rol.rol_id
+        AND existente.permiso_id = permiso.permiso_id);
