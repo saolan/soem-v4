@@ -33,6 +33,44 @@
 
         <!-- maven-compiler-plugin -->
         <maven.compiler.release>21</maven.compiler.release>
+
+        <!-- MapStruct: no viene gestionado por el BOM de WildFly -->
+        <version.mapstruct>1.6.3</version.mapstruct>
+
+        <!-- MicroProfile JWT: API portable; el runtime (smallrye-jwt) lo aporta
+             la capa "microprofile-jwt-smallrye" de WildFly 40. Version 2.1
+             alineada con MicroProfile 6.x / Jakarta EE 11. -->
+        <version.microprofile.jwt>2.1</version.microprofile.jwt>
+
+        <!-- MicroProfile Config: usado para el origen CORS y la config de
+             verificacion del JWT. El runtime lo aporta WildFly (smallrye-config). -->
+        <version.microprofile.config>3.1</version.microprofile.config>
+
+        <!-- BCrypt (modulo seguridad): libreria Java pura, sin binding nativo. -->
+        <version.bcrypt>0.10.2</version.bcrypt>
+
+        <!-- smallrye-jwt-build (modulo seguridad): API de emision/firma de JWT.
+             Se declara "provided": el runtime lo aporta la misma capa
+             microprofile-jwt-smallrye de WildFly 40 que valida los tokens via
+             JsonWebToken. IMPORTANTE: verificar antes de un build real que esta
+             version coincide con la que trae el modulo del servidor
+             ($WILDFLY_HOME/modules/system/layers/base/io/smallrye/jwt/), para
+             evitar incompatibilidades de classfile en tiempo de ejecucion. -->
+        <version.smallrye.jwt>4.6.0</version.smallrye.jwt>
+
+        <!-- Mockito: mocking para tests unitarios de Service (no viene gestionado
+             por el BOM de WildFly ni por el junit-bom). -->
+        <version.mockito>5.14.2</version.mockito>
+
+        <!-- Flyway (modulo seguridad): versionado del esquema segun AGENTS.md.
+             Se ejecuta solo via el profile "migrar-bd" (flyway-maven-plugin),
+             nunca dentro del ciclo de vida de WildFly. -->
+        <version.flyway>10.20.1</version.flyway>
+        <!-- Driver JDBC de Postgres: usado unicamente por el plugin de Flyway
+             en build-time; WildFly ya trae su propio modulo org.postgresql, asi
+             que nunca se declara como dependencia del proyecto (no debe
+             empaquetarse en el WAR). -->
+        <version.postgresql>42.7.13</version.postgresql>
     </properties>
 
     <dependencyManagement>
@@ -131,10 +169,79 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Jakarta JSON Processing: lo requiere microprofile-jwt-auth-api para
+             representar claims JSON (JsonArray/JsonString). Al ser "microprofile-jwt-auth-api"
+             provided, sus dependencias transitivas no se heredan solas: se declara explicita. -->
+        <dependency>
+            <groupId>jakarta.json</groupId>
+            <artifactId>jakarta.json-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- MicroProfile JWT: autenticacion Bearer segun AGENTS.md. La API es
+             portable (provided); el runtime lo aporta el servidor WildFly 40
+             con la capa microprofile-jwt-smallrye aprovisionada. -->
+        <dependency>
+            <groupId>org.eclipse.microprofile.jwt</groupId>
+            <artifactId>microprofile-jwt-auth-api</artifactId>
+            <version>${version.microprofile.jwt}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- MicroProfile Config API: @ConfigProperty para valores externalizados
+             (origen CORS, verificacion del JWT) -->
+        <dependency>
+            <groupId>org.eclipse.microprofile.config</groupId>
+            <artifactId>microprofile-config-api</artifactId>
+            <version>${version.microprofile.config}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- MapStruct: generador de mappers entidad <-> DTO en tiempo de compilacion -->
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${version.mapstruct}</version>
+        </dependency>
+
+        <!-- BCrypt: hashing de contrasenas (modulo seguridad). Libreria Java
+             pura sin dependencias nativas: se empaqueta en el WAR. -->
+        <dependency>
+            <groupId>at.favre.lib</groupId>
+            <artifactId>bcrypt</artifactId>
+            <version>${version.bcrypt}</version>
+        </dependency>
+
+        <!-- smallrye-jwt-build: API fluida para firmar el access token emitido
+             por el modulo seguridad (Jwt.claims()...sign()). Provided: el
+             runtime lo aporta WildFly 40, ver comentario en la propiedad
+             version.smallrye.jwt. -->
+        <dependency>
+            <groupId>io.smallrye</groupId>
+            <artifactId>smallrye-jwt-build</artifactId>
+            <version>${version.smallrye.jwt}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Test scope dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Mockito: aisla la capa Service en tests unitarios, mockeando sus
+             Repositorios sin necesidad de un contenedor CDI. -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${version.mockito}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${version.mockito}</version>
             <scope>test</scope>
         </dependency>
 
@@ -164,6 +271,13 @@
                     <!-- put your configurations here -->
                     <release>${maven.compiler.release}</release>
         			<encoding>${project.build.sourceEncoding}</encoding>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${version.mapstruct}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
 
@@ -195,6 +309,47 @@
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
+        </profile>
+
+        <profile>
+            <!-- Aplica las migraciones Flyway (src/main/resources/db/migration) contra
+                 una base de datos real, fuera del ciclo de vida de WildFly. Requiere las
+                 variables de entorno FLYWAY_URL, FLYWAY_USER y FLYWAY_PASSWORD (nunca
+                 hardcodeadas en este pom). Uso:
+                   mvn -Pmigrar-bd flyway:info      (ver estado de las migraciones)
+                   mvn -Pmigrar-bd flyway:baseline  (una unica vez, sobre una BD que ya
+                                                      tiene el esquema de V1 aplicado a mano)
+                   mvn -Pmigrar-bd flyway:migrate   (aplicar migraciones pendientes) -->
+            <id>migrar-bd</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.flywaydb</groupId>
+                        <artifactId>flyway-maven-plugin</artifactId>
+                        <version>${version.flyway}</version>
+                        <configuration>
+                            <url>${env.FLYWAY_URL}</url>
+                            <user>${env.FLYWAY_USER}</user>
+                            <password>${env.FLYWAY_PASSWORD}</password>
+                            <locations>
+                                <location>classpath:db/migration</location>
+                            </locations>
+                        </configuration>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.flywaydb</groupId>
+                                <artifactId>flyway-database-postgresql</artifactId>
+                                <version>${version.flyway}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.postgresql</groupId>
+                                <artifactId>postgresql</artifactId>
+                                <version>${version.postgresql}</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
 
         <profile>

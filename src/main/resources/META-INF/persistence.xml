@@ -26,6 +26,13 @@
 				value="org.hibernate.dialect.PostgreSQLDialect" />
 			<property name="hibernate.format_sql" value="true" />
 			<property name="hibernate.show_sql" value="false" />
+
+			<!-- Traduce los nombres de atributo camelCase (sucursalId, usuariRegi)
+				 a las columnas snake_case reales del DDL (sucursal_id, usuari_regi),
+				 tal como exige AGENTS.md sin necesidad de anotar @Column en cada
+				 entidad. -->
+			<property name="hibernate.physical_naming_strategy"
+				value="org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy" />
 		</properties>
 	</persistence-unit>
 </persistence>
