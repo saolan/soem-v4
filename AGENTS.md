@@ -96,8 +96,9 @@ Reglas:
 - Verifica la compatibilidad del `record` con Jakarta Bean Validation, JSON-B y MapStruct antes de utilizarlo.
 - Los nombres de los atributos deben ser iguales que los nombres de las columnas de la base de datos en formato camelCase
   ejemplos: caja_id=cajaId, descri=descri, estado_docu_elec=estadoDocuElec, usuari_regi=usuariRegi, fecha_hora_regi=fechaHoraRegi
-- Esta regla incluye los campos de auditoría heredados de `EntidadAuditable`, cuyos nombres ya coinciden con sus columnas, por lo que no requieren mapeo `@Column` adicional (ver AUDITORÍA Y BORRADO LÓGICO).
-
+- Esta convención define cómo se elige el nombre del atributo Java, pero no reemplaza el mapeo explícito: anota siempre `@Column(name = "...")` (o el `name` del `@JoinColumn` correspondiente) con el nombre real de la columna, en **todos** los campos de toda entidad, sin excepción — incluidos los heredados de `EntidadAuditable` (ver AUDITORÍA Y BORRADO LÓGICO). No confíes en la traducción automática camelCase→snake_case del *physical naming strategy* configurado en `persistence.xml`: es frágil en casos como una sola letra mayúscula final (`certO` no traduce a `cert_o`) o siglas consecutivas (`totalIVA`).
+- El crear entidades genera los metodos equals y hashCode **Igualdad por identificador persistente (Vlad Mihalcea pattern)**
+s
 ### Contrato de respuesta JSON
 
 ```json
@@ -137,7 +138,7 @@ Reglas:
 
 ## AUDITORÍA Y BORRADO LÓGICO
 
-- `EntidadAuditable` es una clase `@MappedSuperclass` que contiene **solo los cuatro campos de auditoría**: `usuariRegi`, `fechaHoraRegi`, `usuariModi`, `fechaHoraModi`. Sus nombres coinciden en camelCase con las columnas del DDL (`usuari_regi`, `fecha_hora_regi`, `usuari_modi`, `fecha_hora_modi`), por lo que no requieren mapeo `@Column` adicional.
+- `EntidadAuditable` es una clase `@MappedSuperclass` que contiene **solo los cuatro campos de auditoría**: `usuariRegi`, `fechaHoraRegi`, `usuariModi`, `fechaHoraModi`. Sus nombres coinciden en camelCase con las columnas del DDL (`usuari_regi`, `fecha_hora_regi`, `usuari_modi`, `fecha_hora_modi`), pero igual llevan `@Column(name = "...")` explícito, como el resto de campos de toda entidad.
 - Solo heredan de `EntidadAuditable` las entidades cuya tabla posee esas cuatro columnas (las transaccionales). Las tablas **maestras, de configuración y de detalle** que no las tienen **no heredan** de `EntidadAuditable`.
 - `estado` **no forma parte** de `EntidadAuditable`: no es uniforme (existe solo en algunas tablas y su tipo varía —`BOOL` en maestros y movimientos, `VARCHAR(30)` en comprobantes—). Se declara por entidad, con su tipo real, únicamente donde la columna exista.
 - **Borrado lógico por defecto** (campo `estado`) en las entidades que lo tengan; borrado físico solo cuando se justifique técnicamente.
@@ -215,12 +216,12 @@ Protege los endpoints por permiso y no únicamente por rol.
 - Subpaquetes de capa dentro de cada módulo: `modelo`, `dto`, `repositorio`, `servicio`, `controlador`, `mapeador`
   ejemplo: `com.saolan.soem.caja.modelo`, `com.saolan.soem.caja.servicio`, `com.saolan.soem.caja.controlador`
 
-- Paquete compartido transversal: `com.saolan.soem.comun`
-  - `comun.modelo` → `EntidadAuditable`
-  - `comun.dto` → `RespuestaApi`, `ErrorCampo`, `Paginacion`, `ParametrosBusqueda`, `ComboDTO`
-  - `comun.excepcion` → excepciones de negocio y `ManejadorGlobalExcepciones`
-  - `comun.seguridad` → acciones de permiso, binding de autorización y filtro
-  - `comun.config` → CORS y `@ApplicationPath("/api/v1")`
+- Paquete compartido transversal: `com.saolan.soem.compartido`
+  - `compartido.modelo` → `EntidadAuditable`
+  - `compartido.dto` → `RespuestaApi`, `ErrorCampo`, `Paginacion`, `ParametrosBusqueda`, `ComboDTO`
+  - `compartido.excepcion` → excepciones de negocio y `ManejadorGlobalExcepciones`
+  - `compartido.seguridad` → acciones de permiso, binding de autorización y filtro
+  - `compartido.config` → CORS y `@ApplicationPath("/api/v1")`
 
 - Endpoints REST versionados: `/api/v1/[recurso]` (recursos en **plural**, **kebab-case**)
 
@@ -239,7 +240,7 @@ DELETE /api/v1/cuentas-por-cobrar/{id} el verbo DELETE ejecuta borrado lógico s
 - Endpoint de solo lectura: `GET /api/v1/<recurso-plural-kebab-case>/combo`.
 - Devuelve los registros activos, **sin paginar**, proyectando solo `ComboDTO { valor, etiqueta }` mediante Criteria (no cargar la entidad completa).
 - Cada combo pertenece al **módulo dueño** de la tabla que lista, no al módulo que lo consume.
-- `ComboDTO` se comparte desde `com.saolan.soem.comun`.
+- `ComboDTO` se comparte desde `com.saolan.soem.compartido`.
 
 ## BASE DE DATOS
 

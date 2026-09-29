@@ -76,7 +76,7 @@ Cada FK a una tabla fuera del agregado necesita un combo de solo lectura
 `GET /api/v1/<recurso-plural-kebab-case>/combo`, que devuelve activos sin paginar proyectando solo
 `ComboDTO { valor, etiqueta }` (proyección con Criteria). **Cada combo pertenece al módulo dueño de
 esa tabla, NO a este módulo**; no coloques su ruta bajo `com.saolan.soem.<modulo>`. Lo único
-compartido es `ComboDTO` en `comun`. Si el módulo dueño aún no existe, crea **solo** el endpoint
+compartido es `ComboDTO` en `compartido`. Si el módulo dueño aún no existe, crea **solo** el endpoint
 mínimo de combo (Controller + Service + Repository, más la entidad mínima necesaria para la
 proyección), sin su CRUD completo. Si dudas del dueño, pregúntame.
 
@@ -105,7 +105,7 @@ combo, **lee el módulo dueño** y verifica si ya existe:
 ### Paso 5 — Confirmar y generar
 Preséntame: el árbol del agregado con cardinalidades, la frontera (qué dejaste fuera y por qué),
 las excepciones del Paso 2, las validaciones del Paso 3 y los combos con su módulo dueño. **Espera
-mi visto bueno.** Luego genera `comun` (si falta) y el módulo capa por capa, con código completo y
+mi visto bueno.** Luego genera `compartido` (si falta) y el módulo capa por capa, con código completo y
 funcional (sin omitir imports, sin pseudocódigo), aplicando lo definido en CLAUDE.md. Pregunta
 antes de asumir reglas de negocio no especificadas (semántica de `anular`/`desprocesar`/`convertir`
 para este módulo, bloqueos por estado, predeterminados únicos, etc.).

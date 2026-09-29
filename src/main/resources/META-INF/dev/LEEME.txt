@@ -1,0 +1,20 @@
+ADVERTENCIA: este par de claves RSA es SOLO para desarrollo local.
+
+private-dev.pem / public-dev.pem se generaron con OpenSSL (RSA 2048, sin
+passphrase) unicamente para que `mvn clean verify`, Arquillian y un
+`wildfly:deploy` local puedan firmar y validar JWT sin configuracion
+adicional. Se commitean deliberadamente al repositorio con ese unico
+proposito (decision confirmada explicitamente para este modulo).
+
+NUNCA deben usarse en staging o produccion. Cualquier entorno real debe
+sobreescribir las propiedades `mp.jwt.verify.publickey.location` y
+`smallrye.jwt.sign.key.location` (definidas en
+src/main/resources/META-INF/microprofile-config.properties) via variables
+de entorno, apuntando a un par de claves propio generado y resguardado
+fuera de este repositorio.
+
+Regenerar este par (si se sospecha que quedo expuesto o simplemente para
+rotarlo en desarrollo):
+
+    openssl genrsa -out private-dev.pem 2048
+    openssl rsa -in private-dev.pem -pubout -out public-dev.pem
