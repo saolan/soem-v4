@@ -245,6 +245,21 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Implementaciones de JAX-RS (RuntimeDelegate) y JSON-P solo para los
+             tests unitarios: en produccion las aporta WildFly, pero fuera del
+             contenedor Response.status(...) y Json.createArrayBuilder() fallan
+             sin proveedor. Versiones gestionadas por el BOM de WildFly. -->
+        <dependency>
+            <groupId>org.jboss.resteasy</groupId>
+            <artifactId>resteasy-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.parsson</groupId>
+            <artifactId>parsson</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Optional, but highly recommended -->
         <!-- Arquillian allows you to test enterprise code such as EJBs and
             Transactional(JTA) JPA from JUnit/TestNG -->
