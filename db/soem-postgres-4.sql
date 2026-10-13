@@ -754,6 +754,7 @@ create table PERS_CLIE (
    PERSONA_ID             INT4                             not null,
    PERSONA_SUPE_ID        INT4                             null,
    CLIE_GRUP_ID           INT4                             not null,
+   PERS_VEND_ID			  INT4			                   not null,
    DIMM_ID                INT4                             not null,
    RAZON_SOCI             VARCHAR(100)                     null,
    NATURA                 VARCHAR(2)                       null,
