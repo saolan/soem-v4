@@ -18,7 +18,7 @@ import jakarta.ws.rs.NameBinding;
 @Target({ ElementType.METHOD, ElementType.TYPE })
 public @interface RequierePermiso {
 
-    /** Nombre del recurso protegido, en kebab-case (p. ej. "sucursales"). */
+    /** Nombre del recurso protegido, en kebab-case (p. ej. "configuracion-crud"). */
     String recurso();
 
     /** Accion de negocio requerida sobre el recurso. */

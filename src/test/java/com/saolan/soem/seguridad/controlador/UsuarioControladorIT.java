@@ -53,7 +53,7 @@ import jakarta.ws.rs.core.Response;
 /**
  * Test de integración end-to-end de {@code UsuarioControlador}: login real
  * (mismo usuario semilla que {@code SucursalControladorIT}, con permisos
- * {@code usuarios:*} y {@code roles:*}) y CRUD completo vía HTTP.
+ * {@code seguridad-crud:*}) y CRUD completo vía HTTP.
  */
 @ExtendWith(ArquillianExtension.class)
 class UsuarioControladorIT {
@@ -93,7 +93,7 @@ class UsuarioControladorIT {
                 .request(MediaType.APPLICATION_JSON)
                 .post(Entity.entity(new LoginRequestDTO(USUARIO_PRUEBA, CLAVE_PRUEBA, null), MediaType.APPLICATION_JSON));
         assumeTrue(respuestaLogin.getStatus() == 200,
-                "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' con permisos de usuarios/roles ya cargado en la base");
+                "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' con permisos de seguridad-crud ya cargado en la base");
         accessToken = respuestaLogin.readEntity(new GenericType<RespuestaApi<LoginRespuestaDTO>>() { }).datos().accessToken();
     }
 

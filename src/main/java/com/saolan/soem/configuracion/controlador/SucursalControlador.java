@@ -39,7 +39,8 @@ import jakarta.ws.rs.core.Response;
 @Produces(MediaType.APPLICATION_JSON)
 public class SucursalControlador {
 
-    private static final String RECURSO = "sucursales";
+    // El permiso se controla a nivel de modulo (permisos 6000-6003).
+    private static final String RECURSO = "configuracion-crud";
 
     @Inject
     private SucursalServicio sucursalServicio;

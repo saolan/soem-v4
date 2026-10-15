@@ -32,7 +32,7 @@ import jakarta.transaction.UserTransaction;
 /**
  * Test de integración de {@link PermisoRepositorio}. A diferencia de
  * {@code sucursal}/{@code rol}, la tabla {@code permiso} ya trae filas
- * sembradas por la migración {@code V5__seed_permisos_catalogo.sql}: los
+ * sembradas por la migración {@code V2__permiso_recurso_accion.sql}: los
  * recursos de prueba usan un prefijo aleatorio para no colisionar con esos
  * datos, y las aserciones sobre listados usan {@code anyMatch}/{@code noneMatch}
  * en vez de tamaños absolutos.
