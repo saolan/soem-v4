@@ -55,7 +55,7 @@ import jakarta.ws.rs.core.Response;
 
 /**
  * Test de integración end-to-end de {@code RolControlador}: login real
- * (usuario semilla con permisos {@code roles:*}) y CRUD + sub-recursos
+ * (usuario semilla con permisos {@code seguridad-crud:*}) y CRUD + sub-recursos
  * {@code /permisos} y {@code /sucursales} vía HTTP.
  */
 @ExtendWith(ArquillianExtension.class)
@@ -97,7 +97,7 @@ class RolControladorIT {
                 .request(MediaType.APPLICATION_JSON)
                 .post(Entity.entity(new LoginRequestDTO(USUARIO_PRUEBA, CLAVE_PRUEBA, null), MediaType.APPLICATION_JSON));
         assumeTrue(respuestaLogin.getStatus() == 200,
-                "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' con permisos de roles ya cargado en la base");
+                "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' con permisos de seguridad-crud ya cargado en la base");
         accessToken = respuestaLogin.readEntity(new GenericType<RespuestaApi<LoginRespuestaDTO>>() { }).datos().accessToken();
     }
 

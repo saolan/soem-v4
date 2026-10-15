@@ -49,7 +49,7 @@ import jakarta.ws.rs.core.Response;
  * y llamadas HTTP a {@code /api/v1/parametros}.
  * <p>
  * <b>Precondición</b>: usuario semilla con los permisos
- * {@code parametros:buscar/crear/modificar/eliminar} (V7, ver el bloque de
+ * {@code parametros:buscar/crear/modificar/eliminar} (V2, ver el bloque de
  * resincronización de {@code db/seed-usuario-prueba.sql}).
  */
 @ExtendWith(ArquillianExtension.class)

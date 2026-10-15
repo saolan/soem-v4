@@ -37,7 +37,8 @@ import jakarta.ws.rs.core.Response;
 @Produces(MediaType.APPLICATION_JSON)
 public class PermisoControlador {
 
-    private static final String RECURSO = "permisos";
+    // El permiso se controla a nivel de modulo (permisos 7000-7003).
+    private static final String RECURSO = "seguridad-crud";
 
     @Inject
     private PermisoServicio permisoServicio;

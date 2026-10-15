@@ -7,6 +7,8 @@
   para garantizar login unico y evitar asignaciones rol-recurso duplicadas
   bajo condiciones de carrera.
 ==============================================================================*/
+-- Borra registro repetido
+delete from rol_perm where rol_perm_id = 295;
 
 -- Login unico: PERS_USUA.USUARI es el nombre de usuario.
 ALTER TABLE pers_usua ADD CONSTRAINT uq_pers_usua_usuari UNIQUE (usuari);

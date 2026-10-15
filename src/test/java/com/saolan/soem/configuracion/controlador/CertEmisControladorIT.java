@@ -53,7 +53,7 @@ import jakarta.ws.rs.core.Response;
  * y llamadas HTTP a {@code /api/v1/certificados-emisor}.
  * <p>
  * <b>Precondición</b>: usuario semilla con los permisos
- * {@code certificados-emisor:buscar/crear/modificar/eliminar} (V5 + V6, ver el
+ * {@code certificados-emisor:buscar/crear/modificar/eliminar} (V2, ver el
  * bloque de resincronización de {@code db/seed-usuario-prueba.sql}) y
  * {@code sucursales:crear/modificar} para el caso de emisor en uso.
  */

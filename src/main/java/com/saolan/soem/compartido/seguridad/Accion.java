@@ -13,5 +13,15 @@ public enum Accion {
     ANULAR,
     DESPROCESAR,
     CONVERTIR,
-    IMPRIMIR
+    IMPRIMIR,
+    // Acciones extendidas (V2): operaciones heredadas del sistema anterior.
+    PROCESAR,
+    PAGAR,
+    DESCARGAR,
+    GESTIONAR,
+    BLOQUEAR,
+    MOSTRAR,
+    FILTRAR,
+    ACTUALIZAR,
+    CARGAR
 }
