@@ -3,7 +3,7 @@
   ------------------------------------------------------------------------------
   Dato de prueba, NO es un cambio de esquema: no va en
   src/main/resources/db/migration (Flyway), se corre una unica vez a mano
-  contra la base de pruebas, despues de aplicar las migraciones V1-V5.
+  contra la base de pruebas, despues de aplicar las migraciones V1-V4.
 
   Crea:
     - Una sucursal de prueba en Ambato (ciudad que ningun test usa) con
@@ -14,7 +14,7 @@
       genero con la misma libreria que usa ClaveServicio (at.favre.lib:bcrypt,
       costo 12) y se verifico que efectivamente valida contra ese texto plano.
     - Un rol "Administrador de pruebas" con TODOS los permisos que existan
-      hoy en la tabla permiso (incluye los sembrados por V5) y acceso a la
+      hoy en la tabla permiso (incluye el catalogo sembrado por V2) y acceso a la
       sucursal de prueba creada arriba.
 
   Se puede correr una sola vez: 'admin.test' choca con la UNIQUE de V3 si se
@@ -68,7 +68,7 @@ FROM nuevo_rol, permiso;
 /*------------------------------------------------------------------------------
   Resincronizacion de permisos (idempotente)
   Correr este bloque solo, cada vez que una migracion nueva agregue permisos
-  (V6 en adelante), para que el rol de pruebas tambien los tenga.
+  (V5 en adelante), para que el rol de pruebas tambien los tenga.
 ------------------------------------------------------------------------------*/
 INSERT INTO rol_perm (rol_id, permiso_id, acceso)
 SELECT rol.rol_id, permiso.permiso_id, true

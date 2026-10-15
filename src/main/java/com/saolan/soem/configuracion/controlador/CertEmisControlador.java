@@ -37,7 +37,8 @@ import jakarta.ws.rs.core.Response;
 @Produces(MediaType.APPLICATION_JSON)
 public class CertEmisControlador {
 
-    private static final String RECURSO = "certificados-emisor";
+    // El permiso se controla a nivel de modulo (permisos 6000-6003).
+    private static final String RECURSO = "configuracion-crud";
 
     @Inject
     private CertEmisServicio certEmisServicio;

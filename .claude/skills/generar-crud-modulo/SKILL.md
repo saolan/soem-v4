@@ -14,7 +14,7 @@ Fuentes de verdad, **no las repitas**:
 - **`CLAUDE.md`**: convenciones generales del ERP (idioma, capas y entregables —Entity, DTO,
   Repository, Service, Controller, Mapper—, contrato `RespuestaApi`, paginación, seguridad por
   permiso, CORS, manejo de errores, auditoría/borrado lógico, forma de trabajar). Se cargan solas.
-- **`soem-postgres-4.sql`**: el esquema. No lo regeneres ni inventes columnas; modela contra él.
+- **`src/main/resources/db/migration/V1__esquema_base.sql` + migraciones posteriores (V2, V3…)**: el esquema vigente. No lo regeneres ni inventes columnas; modela contra él.
 
 El primer módulo generado es el **canónico de referencia**: máxima calidad, será copiado por el
 resto. Al generar un módulo nuevo, imita la estructura del módulo ya existente que sirva de patrón.
@@ -104,8 +104,10 @@ combo, **lee el módulo dueño** y verifica si ya existe:
 
 ### Paso 5 — Confirmar y generar
 Preséntame: el árbol del agregado con cardinalidades, la frontera (qué dejaste fuera y por qué),
-las excepciones del Paso 2, las validaciones del Paso 3 y los combos con su módulo dueño. **Espera
-mi visto bueno.** Luego genera `compartido` (si falta) y el módulo capa por capa, con código completo y
+las excepciones del Paso 2, las validaciones del Paso 3, los combos con su módulo dueño y el
+**recurso de permiso** de cada controlador (`<modulo>-crud` o `<modulo>-movimientos`, según
+"Recurso del permiso" en CLAUDE.md; nunca un recurso por tabla o pantalla), verificando que sus
+acciones existan en el catálogo de `permiso`. **Espera mi visto bueno.** Luego genera `compartido` (si falta) y el módulo capa por capa, con código completo y
 funcional (sin omitir imports, sin pseudocódigo), aplicando lo definido en CLAUDE.md. Pregunta
 antes de asumir reglas de negocio no especificadas (semántica de `anular`/`desprocesar`/`convertir`
 para este módulo, bloqueos por estado, predeterminados únicos, etc.).
@@ -133,3 +135,5 @@ Invocación: `/generar-crud-modulo caja caja`
 - **Paso 4 — Combos (cada uno en su módulo dueño):** `sucursales/combo` (`CAJA.sucursal_id`),
   `documentos-egreso/combo` (`CAJA_DOCU_EGRE.documento_id`), `perifericos/combo`
   (`CAJA_PERI.periferico_id`).
+- **Paso 5 — Recurso de permiso:** `CajaControlador` usa `RECURSO = "caja-crud"` (permisos
+  1000–1003). Un futuro controlador de `CAJA_MOVI` usaría `caja-movimientos` (1100…).

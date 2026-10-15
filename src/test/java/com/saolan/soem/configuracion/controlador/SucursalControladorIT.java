@@ -101,7 +101,7 @@ class SucursalControladorIT {
                 .post(Entity.entity(credenciales, MediaType.APPLICATION_JSON));
 
         assumeTrue(respuestaLogin.getStatus() == 200,
-                "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' con permisos de sucursales ya cargado en la base");
+                "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' con permisos de configuracion-crud ya cargado en la base");
 
         RespuestaApi<LoginRespuestaDTO> cuerpo = respuestaLogin.readEntity(new GenericType<RespuestaApi<LoginRespuestaDTO>>() { });
         accessToken = cuerpo.datos().accessToken();
