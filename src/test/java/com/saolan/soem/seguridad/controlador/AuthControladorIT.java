@@ -3,6 +3,7 @@ package com.saolan.soem.seguridad.controlador;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.RespuestaApi;
 import com.saolan.soem.seguridad.dto.CambioClaveDTO;
+import com.saolan.soem.seguridad.dto.CambioSucursalDTO;
 import com.saolan.soem.seguridad.dto.LoginRequestDTO;
 import com.saolan.soem.seguridad.dto.LoginRespuestaDTO;
 import com.saolan.soem.seguridad.dto.SesionActualDTO;
@@ -162,6 +164,41 @@ class AuthControladorIT {
     @Test
     void me_sinToken_deberiaRetornar401() {
         Response respuesta = target("api/v1/auth/me").request(MediaType.APPLICATION_JSON).get();
+
+        assertEquals(401, respuesta.getStatus());
+    }
+
+    @Test
+    void login_deberiaIncluirLasSucursalesAccesibles() {
+        LoginRespuestaDTO cuerpo = cuerpoLogin(login(USUARIO_PRUEBA, CLAVE_PRUEBA));
+
+        assertNotNull(cuerpo.sucursales());
+        assertTrue(cuerpo.sucursales().stream().anyMatch(s -> s.valor().equals(cuerpo.sucursalId())));
+    }
+
+    @Test
+    void cambiarSucursal_deberiaEmitirSesionConLaSucursalElegida() {
+        Response respuestaLogin = login(USUARIO_PRUEBA, CLAVE_PRUEBA);
+        NewCookie cookie = respuestaLogin.getCookies().get(COOKIE_REFRESH);
+        LoginRespuestaDTO cuerpoLogin = cuerpoLogin(respuestaLogin);
+        Integer sucursalElegida = cuerpoLogin.sucursales().get(cuerpoLogin.sucursales().size() - 1).valor();
+
+        Response respuesta = target("api/v1/auth/cambiar-sucursal")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + cuerpoLogin.accessToken())
+                .cookie(cookie)
+                .post(Entity.entity(new CambioSucursalDTO(sucursalElegida), MediaType.APPLICATION_JSON));
+
+        assertEquals(200, respuesta.getStatus());
+        assertEquals(sucursalElegida, cuerpoLogin(respuesta).sucursalId());
+        assertNotEquals(cookie.getValue(), respuesta.getCookies().get(COOKIE_REFRESH).getValue());
+    }
+
+    @Test
+    void cambiarSucursal_sinToken_deberiaRetornar401() {
+        Response respuesta = target("api/v1/auth/cambiar-sucursal")
+                .request(MediaType.APPLICATION_JSON)
+                .post(Entity.entity(new CambioSucursalDTO(1), MediaType.APPLICATION_JSON));
 
         assertEquals(401, respuesta.getStatus());
     }
