@@ -24,10 +24,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.RespuestaApi;
 import com.saolan.soem.compartido.seguridad.Accion;
 import com.saolan.soem.configuracion.modelo.Sucursal;
-import com.saolan.soem.seguridad.dto.AsignacionAccesoDTO;
 import com.saolan.soem.seguridad.dto.LoginRequestDTO;
 import com.saolan.soem.seguridad.dto.LoginRespuestaDTO;
 import com.saolan.soem.seguridad.dto.PermisoDTO;

@@ -3,6 +3,7 @@ package com.saolan.soem.configuracion.servicio;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -19,11 +20,13 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.compartido.excepcion.ExcepcionConflicto;
 import com.saolan.soem.compartido.excepcion.ExcepcionNoEncontrado;
 import com.saolan.soem.compartido.excepcion.ExcepcionValidacion;
+import com.saolan.soem.configuracion.dto.SucuBodeDTO;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
 import com.saolan.soem.configuracion.dto.SucursalDTO;
 import com.saolan.soem.configuracion.dto.SucursalFiltroDTO;
@@ -31,9 +34,12 @@ import com.saolan.soem.configuracion.mapeador.SucuCertEmisMapeador;
 import com.saolan.soem.configuracion.mapeador.SucuCertEmisMapeadorImpl;
 import com.saolan.soem.configuracion.mapeador.SucursalMapeador;
 import com.saolan.soem.configuracion.mapeador.SucursalMapeadorImpl;
+import com.saolan.soem.configuracion.modelo.Bodega;
 import com.saolan.soem.configuracion.modelo.CertEmis;
+import com.saolan.soem.configuracion.modelo.SucuBode;
 import com.saolan.soem.configuracion.modelo.SucuCertEmis;
 import com.saolan.soem.configuracion.modelo.Sucursal;
+import com.saolan.soem.configuracion.repositorio.BodegaRepositorio;
 import com.saolan.soem.configuracion.repositorio.CertEmisRepositorio;
 import com.saolan.soem.configuracion.repositorio.SucursalRepositorio;
 
@@ -52,6 +58,9 @@ class SucursalServicioTest {
 
     @Mock
     private CertEmisRepositorio certEmisRepositorio;
+
+    @Mock
+    private BodegaRepositorio bodegaRepositorio;
 
     @Spy
     private SucursalMapeador sucursalMapeador = new SucursalMapeadorImpl();
@@ -362,7 +371,107 @@ class SucursalServicioTest {
         assertThrows(ExcepcionNoEncontrado.class, () -> sucursalServicio.eliminarCertificadoEmisor(1));
     }
 
+    // ---------- bodegas ----------
+
+    @Test
+    void bodegas_deberiaDelegarEnRepositorio() {
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(crearSucursalEntidad(1, "S001", "1234567890001", false, true)));
+        when(sucursalRepositorio.buscarBodegas(1)).thenReturn(List.of(new SucuBodeDTO(1, "Bodega No.1", true)));
+
+        assertEquals(1, sucursalServicio.bodegas(1).size());
+    }
+
+    @Test
+    void bodegas_deberiaLanzarNoEncontrado_cuandoLaSucursalNoExiste() {
+        when(sucursalRepositorio.buscarPorId(99)).thenReturn(Optional.empty());
+
+        assertThrows(ExcepcionNoEncontrado.class, () -> sucursalServicio.bodegas(99));
+    }
+
+    @Test
+    void reemplazarBodegas_deberiaAplicarPorDiferencia() {
+        Sucursal sucursal = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
+        SucuBode conservada = agregarBodega(sucursal, crearBodegaEntidad(1, true), true);
+        agregarBodega(sucursal, crearBodegaEntidad(3, true), true);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(sucursal));
+        when(bodegaRepositorio.buscarPorId(2)).thenReturn(Optional.of(crearBodegaEntidad(2, true)));
+
+        sucursalServicio.reemplazarBodegas(1, List.of(new AsignacionAccesoDTO(1, true), new AsignacionAccesoDTO(2, true)));
+
+        assertEquals(2, sucursal.getBodegas().size());
+        assertSame(conservada, sucursal.getBodegas().get(0));
+        assertEquals(2, sucursal.getBodegas().get(1).getBodega().getBodegaId());
+        verify(bodegaRepositorio, never()).buscarPorId(1);
+    }
+
+    @Test
+    void reemplazarBodegas_deberiaLanzarValidacion_cuandoLaBodegaNoExiste() {
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(crearSucursalEntidad(1, "S001", "1234567890001", false, true)));
+        when(bodegaRepositorio.buscarPorId(99)).thenReturn(Optional.empty());
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class,
+                () -> sucursalServicio.reemplazarBodegas(1, List.of(new AsignacionAccesoDTO(99, true))));
+        assertEquals("bodegas", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void reemplazarBodegas_deberiaLanzarValidacion_cuandoSeHabilitaUnaBodegaInactiva() {
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(crearSucursalEntidad(1, "S001", "1234567890001", false, true)));
+        when(bodegaRepositorio.buscarPorId(2)).thenReturn(Optional.of(crearBodegaEntidad(2, false)));
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class,
+                () -> sucursalServicio.reemplazarBodegas(1, List.of(new AsignacionAccesoDTO(2, true))));
+        assertEquals("bodegas", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void reemplazarBodegas_deberiaLanzarValidacion_cuandoSeRehabilitaUnaBodegaInactiva() {
+        Sucursal sucursal = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
+        agregarBodega(sucursal, crearBodegaEntidad(2, false), false);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(sucursal));
+
+        assertThrows(ExcepcionValidacion.class,
+                () -> sucursalServicio.reemplazarBodegas(1, List.of(new AsignacionAccesoDTO(2, true))));
+    }
+
+    @Test
+    void reemplazarBodegas_deberiaPermitirDeshabilitarUnaBodegaInactiva() {
+        Sucursal sucursal = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
+        SucuBode asignada = agregarBodega(sucursal, crearBodegaEntidad(2, false), true);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(sucursal));
+
+        sucursalServicio.reemplazarBodegas(1, List.of(new AsignacionAccesoDTO(2, false)));
+
+        assertFalse(asignada.getAcceso());
+    }
+
+    @Test
+    void reemplazarBodegas_deberiaLanzarValidacion_cuandoLaBodegaEstaRepetida() {
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(crearSucursalEntidad(1, "S001", "1234567890001", false, true)));
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class, () -> sucursalServicio.reemplazarBodegas(1,
+                List.of(new AsignacionAccesoDTO(1, true), new AsignacionAccesoDTO(1, false))));
+        assertEquals("bodegas", excepcion.getErrores().get(0).campo());
+    }
+
     // ---------- helpers ----------
+
+    private Bodega crearBodegaEntidad(Integer bodegaId, boolean estado) {
+        Bodega bodega = new Bodega();
+        bodega.setBodegaId(bodegaId);
+        bodega.setDescri("Bodega " + bodegaId);
+        bodega.setEstado(estado);
+        return bodega;
+    }
+
+    private SucuBode agregarBodega(Sucursal sucursal, Bodega bodega, boolean acceso) {
+        SucuBode sucuBode = new SucuBode();
+        sucuBode.setSucursal(sucursal);
+        sucuBode.setBodega(bodega);
+        sucuBode.setAcceso(acceso);
+        sucursal.getBodegas().add(sucuBode);
+        return sucuBode;
+    }
 
     private SucursalDTO crearSucursalDTO(Integer sucursalId, String codigo, String ruc, boolean matriz) {
         return new SucursalDTO(sucursalId, codigo, matriz, "Sucursal Test", ruc, "Razón Social Test",
