@@ -1,6 +1,8 @@
 package com.saolan.soem.configuracion.modelo;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -9,13 +11,16 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 /**
  * Sucursal de la empresa. Raiz del agregado configuracion/sucursal; no
  * extiende {@code EntidadAuditable} porque la tabla no tiene columnas de
- * auditoria. Se da de baja logicamente mediante {@code estado}.
+ * auditoria. Se da de baja logicamente mediante {@code estado}. Es duena de
+ * las composiciones {@code certificadoEmisor} ({@link SucuCertEmis}, 1:1) y
+ * {@code bodegas} ({@link SucuBode}, 1:N).
  */
 @Entity
 @Table(name = "sucursal")
@@ -91,6 +96,10 @@ public class Sucursal implements Serializable {
     /** Composicion 1:1 opcional: configuracion del certificado de firma electronica. */
     @OneToOne(mappedBy = "sucursal", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, optional = true)
     private SucuCertEmis certificadoEmisor;
+
+    /** Composicion 1:N: bodegas habilitadas para la sucursal (reemplazo en bloque desde {@code SucursalServicio}). */
+    @OneToMany(mappedBy = "sucursal", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<SucuBode> bodegas = new ArrayList<>();
 
     public Integer getSucursalId() {
         return sucursalId;
@@ -266,6 +275,10 @@ public class Sucursal implements Serializable {
 
     public void setCertificadoEmisor(SucuCertEmis certificadoEmisor) {
         this.certificadoEmisor = certificadoEmisor;
+    }
+
+    public List<SucuBode> getBodegas() {
+        return bodegas;
     }
 
     /**

@@ -2,12 +2,14 @@ package com.saolan.soem.configuracion.controlador;
 
 import java.util.List;
 
+import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.Paginacion;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.compartido.dto.RespuestaApi;
 import com.saolan.soem.compartido.seguridad.Accion;
 import com.saolan.soem.compartido.seguridad.RequierePermiso;
+import com.saolan.soem.configuracion.dto.SucuBodeDTO;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
 import com.saolan.soem.configuracion.dto.SucursalDTO;
 import com.saolan.soem.configuracion.dto.SucursalFiltroDTO;
@@ -32,7 +34,8 @@ import jakarta.ws.rs.core.Response;
  * Endpoints REST del agregado Sucursal (raiz {@code configuracion/sucursal}).
  * La composicion {@code certificadoEmisor} se administra como sub-recurso
  * propio bajo {@code /{id}/certificado-emision} (pantalla separada en el
- * frontend), no viaja embebida en {@link SucursalDTO}.
+ * frontend), no viaja embebida en {@link SucursalDTO}; igual las bodegas
+ * habilitadas, bajo {@code /{id}/bodegas} (lectura y reemplazo en bloque).
  */
 @Path("/sucursales")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -130,5 +133,21 @@ public class SucursalControlador {
     public Response eliminarCertificadoEmisor(@PathParam("id") Integer id) {
         sucursalServicio.eliminarCertificadoEmisor(id);
         return Response.ok(RespuestaApi.<Void>exito(null, "Certificado de firma electrónica eliminado correctamente")).build();
+    }
+
+    @GET
+    @Path("/{id}/bodegas")
+    @RequierePermiso(recurso = RECURSO, accion = Accion.BUSCAR)
+    public Response bodegas(@PathParam("id") Integer id) {
+        List<SucuBodeDTO> resultado = sucursalServicio.bodegas(id);
+        return Response.ok(RespuestaApi.exito(resultado)).build();
+    }
+
+    @PUT
+    @Path("/{id}/bodegas")
+    @RequierePermiso(recurso = RECURSO, accion = Accion.MODIFICAR)
+    public Response reemplazarBodegas(@PathParam("id") Integer id, @Valid List<AsignacionAccesoDTO> asignaciones) {
+        sucursalServicio.reemplazarBodegas(id, asignaciones);
+        return Response.ok(RespuestaApi.<Void>exito(null, "Bodegas de la sucursal actualizadas correctamente")).build();
     }
 }

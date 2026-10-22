@@ -8,7 +8,10 @@ import java.util.Set;
 
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
+import com.saolan.soem.configuracion.dto.SucuBodeDTO;
 import com.saolan.soem.configuracion.dto.SucursalFiltroDTO;
+import com.saolan.soem.configuracion.modelo.Bodega;
+import com.saolan.soem.configuracion.modelo.SucuBode;
 import com.saolan.soem.configuracion.modelo.Sucursal;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,6 +19,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -123,6 +127,24 @@ public class SucursalRepositorio {
         query.select(criteriaBuilder.construct(ComboDTO.class, raiz.get("sucursalId"), raiz.get("descri")));
         query.where(criteriaBuilder.isTrue(raiz.get("estado")));
         query.orderBy(criteriaBuilder.asc(raiz.get("descri")));
+
+        return entityManager.createQuery(query).getResultList();
+    }
+
+    /**
+     * Bodegas asignadas a la sucursal ({@code SUCU_BODE}) proyectadas a
+     * {@link SucuBodeDTO} en una sola consulta, ordenadas por descripcion.
+     */
+    public List<SucuBodeDTO> buscarBodegas(Integer sucursalId) {
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<SucuBodeDTO> query = criteriaBuilder.createQuery(SucuBodeDTO.class);
+        Root<SucuBode> raiz = query.from(SucuBode.class);
+        Join<SucuBode, Bodega> bodega = raiz.join("bodega");
+
+        query.select(criteriaBuilder.construct(SucuBodeDTO.class,
+                bodega.get("bodegaId"), bodega.get("descri"), raiz.get("acceso")));
+        query.where(criteriaBuilder.equal(raiz.get("sucursal").get("sucursalId"), sucursalId));
+        query.orderBy(criteriaBuilder.asc(bodega.get("descri")));
 
         return entityManager.createQuery(query).getResultList();
     }

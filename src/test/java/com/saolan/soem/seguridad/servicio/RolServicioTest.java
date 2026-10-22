@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.compartido.excepcion.ExcepcionNoEncontrado;
@@ -25,7 +26,6 @@ import com.saolan.soem.compartido.excepcion.ExcepcionValidacion;
 import com.saolan.soem.compartido.seguridad.Accion;
 import com.saolan.soem.configuracion.modelo.Sucursal;
 import com.saolan.soem.configuracion.repositorio.SucursalRepositorio;
-import com.saolan.soem.seguridad.dto.AsignacionAccesoDTO;
 import com.saolan.soem.seguridad.dto.RolDTO;
 import com.saolan.soem.seguridad.dto.RolFiltroDTO;
 import com.saolan.soem.seguridad.mapeador.RolMapeador;

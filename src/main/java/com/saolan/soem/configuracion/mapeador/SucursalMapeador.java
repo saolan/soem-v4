@@ -10,9 +10,10 @@ import com.saolan.soem.configuracion.dto.SucursalDTO;
 import com.saolan.soem.configuracion.modelo.Sucursal;
 
 /**
- * Mapeo entidad/DTO de {@link Sucursal}. La composicion
- * {@code certificadoEmisor} no forma parte de {@link SucursalDTO} (se
- * administra como sub-recurso propio, ver {@code SucursalServicio}); se
+ * Mapeo entidad/DTO de {@link Sucursal}. Las composiciones
+ * {@code certificadoEmisor} y {@code bodegas} no forman parte de
+ * {@link SucursalDTO} (se administran como sub-recursos propios, ver
+ * {@code SucursalServicio}); se
  * ignora explicitamente en ambas direcciones DTO -&gt; entidad para que
  * MapStruct no reporte "unmapped target property", ya que la entidad
  * {@link Sucursal} si tiene ese campo.
@@ -22,6 +23,7 @@ public interface SucursalMapeador {
 
     @Mapping(target = "sucursalId", ignore = true)
     @Mapping(target = "certificadoEmisor", ignore = true)
+    @Mapping(target = "bodegas", ignore = true)
     Sucursal aSucursal(SucursalDTO sucursalDTO);
 
     SucursalDTO aSucursalDTO(Sucursal sucursal);
@@ -29,5 +31,6 @@ public interface SucursalMapeador {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "sucursalId", ignore = true)
     @Mapping(target = "certificadoEmisor", ignore = true)
+    @Mapping(target = "bodegas", ignore = true)
     void actualizarEntidadDesdeDto(SucursalDTO sucursalDTO, @MappingTarget Sucursal sucursal);
 }
