@@ -48,5 +48,7 @@ public class FiltroCors implements ContainerRequestFilter, ContainerResponseFilt
         responseContext.getHeaders().putSingle("Access-Control-Allow-Methods", METODOS_PERMITIDOS);
         responseContext.getHeaders().putSingle("Access-Control-Allow-Headers", ENCABEZADOS_PERMITIDOS);
         responseContext.getHeaders().putSingle("Access-Control-Allow-Credentials", "true");
+        // Evita que un proxy o cache intermedio reutilice la respuesta para otro origen.
+        responseContext.getHeaders().add("Vary", "Origin");
     }
 }

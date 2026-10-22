@@ -11,5 +11,6 @@ public record SesionActualDTO(
         Integer personaId,
         String usuario,
         Integer sucursalId,
-        List<String> permisos) {
+        List<String> permisos,
+        boolean claveCaducada) {
 }

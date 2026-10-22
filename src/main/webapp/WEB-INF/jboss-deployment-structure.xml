@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Modulos del servidor que necesita smallrye-jwt-build (empaquetado en el WAR
+  para firmar el access token): smallrye-jwt-common y jose4j viven en estos
+  modulos de WildFly y no se duplican en WEB-INF/lib (ver pom.xml).
+-->
+<jboss-deployment-structure xmlns="urn:jboss:deployment-structure:1.2">
+    <deployment>
+        <dependencies>
+            <module name="io.smallrye.jwt"/>
+            <module name="org.bitbucket.jose4j"/>
+            <module name="io.smallrye.config"/>
+        </dependencies>
+    </deployment>
+</jboss-deployment-structure>
