@@ -3,20 +3,26 @@ package com.saolan.soem.configuracion.servicio;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ErrorCampo;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.compartido.excepcion.ExcepcionConflicto;
 import com.saolan.soem.compartido.excepcion.ExcepcionNoEncontrado;
 import com.saolan.soem.compartido.excepcion.ExcepcionValidacion;
+import com.saolan.soem.compartido.servicio.ReemplazoPorDiferencia;
+import com.saolan.soem.configuracion.dto.SucuBodeDTO;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
 import com.saolan.soem.configuracion.dto.SucursalDTO;
 import com.saolan.soem.configuracion.dto.SucursalFiltroDTO;
 import com.saolan.soem.configuracion.mapeador.SucuCertEmisMapeador;
 import com.saolan.soem.configuracion.mapeador.SucursalMapeador;
+import com.saolan.soem.configuracion.modelo.Bodega;
 import com.saolan.soem.configuracion.modelo.CertEmis;
+import com.saolan.soem.configuracion.modelo.SucuBode;
 import com.saolan.soem.configuracion.modelo.SucuCertEmis;
 import com.saolan.soem.configuracion.modelo.Sucursal;
+import com.saolan.soem.configuracion.repositorio.BodegaRepositorio;
 import com.saolan.soem.configuracion.repositorio.CertEmisRepositorio;
 import com.saolan.soem.configuracion.repositorio.SucursalRepositorio;
 
@@ -28,11 +34,12 @@ import jakarta.transaction.Transactional;
  * Reglas de negocio del agregado {@link Sucursal}: unicidad de
  * {@code codigo}/{@code ruc} (restricciones documentadas en el DDL pero no
  * declaradas en la base de datos), singleton de {@code matriz} y la
- * composicion 1:1 con {@link SucuCertEmis}, expuesta como sub-recurso
- * independiente ({@code /sucursales/{id}/certificado-emision}) pero
- * administrada siempre dentro de la transaccion de este mismo Service, sin
- * un Service propio, para no permitir mutarla sin las validaciones de la
- * sucursal duena.
+ * composiciones con {@link SucuCertEmis} (1:1) y {@link SucuBode} (1:N),
+ * expuestas como sub-recursos independientes
+ * ({@code /sucursales/{id}/certificado-emision} y
+ * {@code /sucursales/{id}/bodegas}) pero administradas siempre dentro de la
+ * transaccion de este mismo Service, sin un Service propio, para no permitir
+ * mutarlas sin las validaciones de la sucursal duena.
  */
 @ApplicationScoped
 public class SucursalServicio {
@@ -42,6 +49,9 @@ public class SucursalServicio {
 
     @Inject
     private CertEmisRepositorio certEmisRepositorio;
+
+    @Inject
+    private BodegaRepositorio bodegaRepositorio;
 
     @Inject
     private SucursalMapeador sucursalMapeador;
@@ -179,6 +189,53 @@ public class SucursalServicio {
             throw new ExcepcionNoEncontrado("La sucursal no tiene un certificado de firma electrónica configurado");
         }
         sucursal.setCertificadoEmisor(null);
+    }
+
+    /**
+     * Sub-recurso {@code /sucursales/{id}/bodegas}: bodegas asignadas a la
+     * sucursal, habilitadas o no.
+     */
+    public List<SucuBodeDTO> bodegas(Integer sucursalId) {
+        obtenerOFallar(sucursalId);
+        return sucursalRepositorio.buscarBodegas(sucursalId);
+    }
+
+    /**
+     * Sub-recurso {@code /sucursales/{id}/bodegas}: reemplaza en bloque las
+     * bodegas de la sucursal. Una bodega nueva o rehabilitada con
+     * {@code acceso} debe estar activa; deshabilitar o quitar una inactiva
+     * siempre se permite.
+     */
+    @Transactional
+    public void reemplazarBodegas(Integer sucursalId, List<AsignacionAccesoDTO> asignaciones) {
+        Sucursal sucursal = obtenerOFallar(sucursalId);
+
+        ReemplazoPorDiferencia.aplicar(sucursal.getBodegas(), asignaciones, "bodegas",
+                sucuBode -> sucuBode.getBodega().getBodegaId(),
+                (sucuBode, acceso) -> {
+                    if (Boolean.TRUE.equals(acceso) && !Boolean.TRUE.equals(sucuBode.getAcceso())) {
+                        validarBodegaActiva(sucuBode.getBodega());
+                    }
+                    sucuBode.setAcceso(acceso);
+                },
+                (bodegaId, acceso) -> {
+                    Bodega bodega = bodegaRepositorio.buscarPorId(bodegaId)
+                            .orElseThrow(() -> excepcionDeCampo("bodegas", "La bodega " + bodegaId + " no existe"));
+                    if (Boolean.TRUE.equals(acceso)) {
+                        validarBodegaActiva(bodega);
+                    }
+                    SucuBode sucuBode = new SucuBode();
+                    sucuBode.setSucursal(sucursal);
+                    sucuBode.setBodega(bodega);
+                    sucuBode.setAcceso(acceso);
+                    return sucuBode;
+                });
+    }
+
+    private void validarBodegaActiva(Bodega bodega) {
+        if (!Boolean.TRUE.equals(bodega.getEstado())) {
+            throw excepcionDeCampo("bodegas", "La bodega " + bodega.getBodegaId() + " está inactiva");
+        }
     }
 
     private CertEmis resolverCertEmisActivo(Integer certEmisId) {

@@ -1,21 +1,16 @@
 package com.saolan.soem.seguridad.servicio;
 
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
+import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ErrorCampo;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.compartido.excepcion.ExcepcionNoEncontrado;
 import com.saolan.soem.compartido.excepcion.ExcepcionValidacion;
+import com.saolan.soem.compartido.servicio.ReemplazoPorDiferencia;
 import com.saolan.soem.configuracion.modelo.Sucursal;
 import com.saolan.soem.configuracion.repositorio.SucursalRepositorio;
-import com.saolan.soem.seguridad.dto.AsignacionAccesoDTO;
 import com.saolan.soem.seguridad.dto.RolDTO;
 import com.saolan.soem.seguridad.dto.RolFiltroDTO;
 import com.saolan.soem.seguridad.mapeador.RolMapeador;
@@ -105,7 +100,7 @@ public class RolServicio {
     public void reemplazarPermisos(Integer rolId, List<AsignacionAccesoDTO> asignaciones) {
         Rol rol = obtenerOFallar(rolId);
 
-        reemplazarPorDiferencia(rol.getPermisos(), asignaciones, "permisos",
+        ReemplazoPorDiferencia.aplicar(rol.getPermisos(), asignaciones, "permisos",
                 rolPerm -> rolPerm.getPermiso().getPermisoId(),
                 RolPerm::setAcceso,
                 (permisoId, acceso) -> {
@@ -127,7 +122,7 @@ public class RolServicio {
     public void reemplazarSucursales(Integer rolId, List<AsignacionAccesoDTO> asignaciones) {
         Rol rol = obtenerOFallar(rolId);
 
-        reemplazarPorDiferencia(rol.getSucursales(), asignaciones, "sucursales",
+        ReemplazoPorDiferencia.aplicar(rol.getSucursales(), asignaciones, "sucursales",
                 rolSucu -> rolSucu.getSucursal().getSucursalId(),
                 RolSucu::setAcceso,
                 (sucursalId, acceso) -> {
@@ -149,7 +144,7 @@ public class RolServicio {
     public void reemplazarMenus(Integer rolId, List<AsignacionAccesoDTO> asignaciones) {
         Rol rol = obtenerOFallar(rolId);
 
-        reemplazarPorDiferencia(rol.getMenus(), asignaciones, "menus",
+        ReemplazoPorDiferencia.aplicar(rol.getMenus(), asignaciones, "menus",
                 rolMenu -> rolMenu.getMenu().getMenuId(),
                 RolMenu::setAcceso,
                 (menuId, acceso) -> {
@@ -161,45 +156,6 @@ public class RolServicio {
                     rolMenu.setAcceso(acceso);
                     return rolMenu;
                 });
-    }
-
-    /**
-     * Reemplazo en bloque de una composicion rol-recurso aplicado por
-     * diferencia: actualiza el {@code acceso} de las filas que siguen, quita
-     * las ausentes y agrega solo las nuevas. No se usa {@code clear()} +
-     * {@code add}: Hibernate ejecuta los INSERT antes que los DELETE de
-     * huerfanos, y reenviar un recurso ya asignado violaria la unicidad
-     * {@code (rol_id, <recurso>_id)} de la tabla.
-     *
-     * @param asignadas      coleccion actual del rol (se modifica en sitio)
-     * @param campo          campo reportado en los errores de validacion
-     * @param idDe           id del recurso referenciado por una fila
-     * @param asignarAcceso  actualiza el {@code acceso} de una fila existente
-     * @param crear          construye la fila nueva (valida que el recurso exista)
-     */
-    private <T> void reemplazarPorDiferencia(List<T> asignadas, List<AsignacionAccesoDTO> asignaciones, String campo,
-            Function<T, Integer> idDe, BiConsumer<T, Boolean> asignarAcceso, BiFunction<Integer, Boolean, T> crear) {
-        Map<Integer, Boolean> accesoPorId = new LinkedHashMap<>();
-        for (AsignacionAccesoDTO asignacion : asignaciones) {
-            if (accesoPorId.put(asignacion.valor(), asignacion.acceso()) != null) {
-                throw excepcionDeCampo(campo, "El identificador " + asignacion.valor() + " está repetido");
-            }
-        }
-
-        asignadas.removeIf(fila -> !accesoPorId.containsKey(idDe.apply(fila)));
-        Map<Integer, T> existentes = new HashMap<>();
-        for (T fila : asignadas) {
-            existentes.put(idDe.apply(fila), fila);
-        }
-
-        for (Map.Entry<Integer, Boolean> entrada : accesoPorId.entrySet()) {
-            T existente = existentes.get(entrada.getKey());
-            if (existente != null) {
-                asignarAcceso.accept(existente, entrada.getValue());
-            } else {
-                asignadas.add(crear.apply(entrada.getKey(), entrada.getValue()));
-            }
-        }
     }
 
     private Rol obtenerOFallar(Integer rolId) {

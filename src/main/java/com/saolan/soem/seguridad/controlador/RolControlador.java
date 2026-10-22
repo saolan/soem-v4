@@ -2,13 +2,13 @@ package com.saolan.soem.seguridad.controlador;
 
 import java.util.List;
 
+import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.Paginacion;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.compartido.dto.RespuestaApi;
 import com.saolan.soem.compartido.seguridad.Accion;
 import com.saolan.soem.compartido.seguridad.RequierePermiso;
-import com.saolan.soem.seguridad.dto.AsignacionAccesoDTO;
 import com.saolan.soem.seguridad.dto.RolDTO;
 import com.saolan.soem.seguridad.dto.RolFiltroDTO;
 import com.saolan.soem.seguridad.servicio.RolServicio;
