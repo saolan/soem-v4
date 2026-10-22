@@ -18,8 +18,8 @@ import jakarta.persistence.Table;
  * Rol del sistema. No extiende {@code EntidadAuditable} porque la tabla no
  * tiene columnas de auditoria. Se da de baja logicamente mediante
  * {@code estado}. Es dueno de las composiciones {@code permisos}
- * ({@link RolPerm}) y {@code sucursales} ({@link RolSucu}): ambas se
- * reemplazan en bloque desde {@code RolServicio}.
+ * ({@link RolPerm}), {@code sucursales} ({@link RolSucu}) y {@code menus}
+ * ({@link RolMenu}): todas se reemplazan en bloque desde {@code RolServicio}.
  */
 @Entity
 @Table(name = "rol")
@@ -43,6 +43,9 @@ public class Rol implements Serializable {
 
     @OneToMany(mappedBy = "rol", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<RolSucu> sucursales = new ArrayList<>();
+
+    @OneToMany(mappedBy = "rol", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<RolMenu> menus = new ArrayList<>();
 
     public Integer getRolId() {
         return rolId;
@@ -74,6 +77,10 @@ public class Rol implements Serializable {
 
     public List<RolSucu> getSucursales() {
         return sucursales;
+    }
+
+    public List<RolMenu> getMenus() {
+        return menus;
     }
 
     @Override

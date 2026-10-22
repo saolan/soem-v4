@@ -29,9 +29,10 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 /**
- * Endpoints REST del agregado Rol. Los permisos y las sucursales habilitadas
- * se administran como sub-recursos propios bajo {@code /{id}/permisos} y
- * {@code /{id}/sucursales} (reemplazo en bloque), no viajan embebidos en
+ * Endpoints REST del agregado Rol. Los permisos, las sucursales y los menus
+ * habilitados se administran como sub-recursos propios bajo
+ * {@code /{id}/permisos}, {@code /{id}/sucursales} y {@code /{id}/menus}
+ * (reemplazo en bloque), no viajan embebidos en
  * {@link RolDTO}.
  */
 @Path("/roles")
@@ -119,5 +120,13 @@ public class RolControlador {
     public Response reemplazarSucursales(@PathParam("id") Integer id, @Valid List<AsignacionAccesoDTO> asignaciones) {
         rolServicio.reemplazarSucursales(id, asignaciones);
         return Response.ok(RespuestaApi.<Void>exito(null, "Sucursales del rol actualizadas correctamente")).build();
+    }
+
+    @PUT
+    @Path("/{id}/menus")
+    @RequierePermiso(recurso = RECURSO, accion = Accion.MODIFICAR)
+    public Response reemplazarMenus(@PathParam("id") Integer id, @Valid List<AsignacionAccesoDTO> asignaciones) {
+        rolServicio.reemplazarMenus(id, asignaciones);
+        return Response.ok(RespuestaApi.<Void>exito(null, "Menús del rol actualizados correctamente")).build();
     }
 }

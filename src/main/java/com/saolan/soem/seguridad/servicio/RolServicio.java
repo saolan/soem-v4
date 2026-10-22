@@ -1,6 +1,9 @@
 package com.saolan.soem.seguridad.servicio;
 
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ErrorCampo;
@@ -13,10 +16,13 @@ import com.saolan.soem.seguridad.dto.AsignacionAccesoDTO;
 import com.saolan.soem.seguridad.dto.RolDTO;
 import com.saolan.soem.seguridad.dto.RolFiltroDTO;
 import com.saolan.soem.seguridad.mapeador.RolMapeador;
+import com.saolan.soem.seguridad.modelo.Menu;
 import com.saolan.soem.seguridad.modelo.Permiso;
 import com.saolan.soem.seguridad.modelo.Rol;
+import com.saolan.soem.seguridad.modelo.RolMenu;
 import com.saolan.soem.seguridad.modelo.RolPerm;
 import com.saolan.soem.seguridad.modelo.RolSucu;
+import com.saolan.soem.seguridad.repositorio.MenuRepositorio;
 import com.saolan.soem.seguridad.repositorio.PermisoRepositorio;
 import com.saolan.soem.seguridad.repositorio.RolRepositorio;
 
@@ -26,8 +32,8 @@ import jakarta.transaction.Transactional;
 
 /**
  * Reglas de negocio del agregado {@link Rol}: CRUD basico y las
- * composiciones {@code permisos} ({@link RolPerm}) y {@code sucursales}
- * ({@link RolSucu}), expuestas como sub-recursos independientes pero
+ * composiciones {@code permisos} ({@link RolPerm}), {@code sucursales}
+ * ({@link RolSucu}) y {@code menus} ({@link RolMenu}), expuestas como sub-recursos independientes pero
  * administradas siempre dentro de la transaccion de este mismo Service, sin
  * Service propio, para no permitir mutarlas sin validar que el permiso o la
  * sucursal referenciados existan.
@@ -43,6 +49,9 @@ public class RolServicio {
 
     @Inject
     private SucursalRepositorio sucursalRepositorio;
+
+    @Inject
+    private MenuRepositorio menuRepositorio;
 
     @Inject
     private RolMapeador rolMapeador;
@@ -124,6 +133,48 @@ public class RolServicio {
             rolSucu.setSucursal(sucursal);
             rolSucu.setAcceso(asignacion.acceso());
             rol.getSucursales().add(rolSucu);
+        }
+    }
+
+    /**
+     * Sub-recurso {@code /roles/{id}/menus}: reemplaza en bloque los menus
+     * habilitados para el rol. Se aplica por diferencia (actualiza el
+     * {@code acceso} de las filas existentes, quita las ausentes y agrega
+     * las nuevas) y no con {@code clear()} + {@code add}: Hibernate ejecuta
+     * los INSERT antes que los DELETE de huerfanos, y reenviar un menu ya
+     * asignado violaria {@code uq_rol_menu (rol_id, menu_id)}.
+     */
+    @Transactional
+    public void reemplazarMenus(Integer rolId, List<AsignacionAccesoDTO> asignaciones) {
+        Rol rol = obtenerOFallar(rolId);
+
+        Map<Integer, Boolean> accesoPorMenu = new LinkedHashMap<>();
+        for (AsignacionAccesoDTO asignacion : asignaciones) {
+            if (accesoPorMenu.put(asignacion.valor(), asignacion.acceso()) != null) {
+                throw excepcionDeCampo("menus", "El menú " + asignacion.valor() + " está repetido");
+            }
+        }
+
+        rol.getMenus().removeIf(rolMenu -> !accesoPorMenu.containsKey(rolMenu.getMenu().getMenuId()));
+        Map<Integer, RolMenu> existentes = new HashMap<>();
+        for (RolMenu rolMenu : rol.getMenus()) {
+            existentes.put(rolMenu.getMenu().getMenuId(), rolMenu);
+        }
+
+        for (Map.Entry<Integer, Boolean> entrada : accesoPorMenu.entrySet()) {
+            RolMenu existente = existentes.get(entrada.getKey());
+            if (existente != null) {
+                existente.setAcceso(entrada.getValue());
+                continue;
+            }
+            Menu menu = menuRepositorio.buscarPorId(entrada.getKey())
+                    .orElseThrow(() -> excepcionDeCampo("menus", "El menú " + entrada.getKey() + " no existe"));
+
+            RolMenu rolMenu = new RolMenu();
+            rolMenu.setRol(rol);
+            rolMenu.setMenu(menu);
+            rolMenu.setAcceso(entrada.getValue());
+            rol.getMenus().add(rolMenu);
         }
     }
 
