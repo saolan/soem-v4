@@ -1,5 +1,6 @@
 package com.saolan.soem.seguridad.servicio;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,6 +26,19 @@ class ClaveServicioTest {
         Field campoCosto = ClaveServicio.class.getDeclaredField("costo");
         campoCosto.setAccessible(true);
         campoCosto.set(claveServicio, 4);
+        claveServicio.inicializar();
+    }
+
+    @Test
+    void verificar_deberiaSerFalso_cuandoLaClaveSuperaLos72Bytes() {
+        String hash = claveServicio.hashear("MiClaveSegura123");
+
+        assertFalse(claveServicio.verificar("x".repeat(73), hash));
+    }
+
+    @Test
+    void simularVerificacion_noDeberiaFallar() {
+        assertDoesNotThrow(() -> claveServicio.simularVerificacion("CualquierClave"));
     }
 
     @Test

@@ -37,8 +37,19 @@ public class UsuarioRepositorio {
     @PersistenceContext
     private EntityManager entityManager;
 
+    /**
+     * Carga la {@link Persona} en la misma consulta: el mapeo a DTO ocurre
+     * fuera de transaccion y un proxy perezoso fallaria con
+     * {@code LazyInitializationException}.
+     */
     public Optional<PersUsua> buscarPorId(Integer personaId) {
-        return Optional.ofNullable(entityManager.find(PersUsua.class, personaId));
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<PersUsua> query = criteriaBuilder.createQuery(PersUsua.class);
+        Root<PersUsua> raiz = query.from(PersUsua.class);
+        raiz.fetch("persona");
+
+        query.where(criteriaBuilder.equal(raiz.get("personaId"), personaId));
+        return entityManager.createQuery(query).getResultStream().findFirst();
     }
 
     public Optional<PersUsua> buscarPorUsuari(String usuari) {
@@ -54,11 +65,16 @@ public class UsuarioRepositorio {
         entityManager.persist(persUsua);
     }
 
+    /**
+     * Fetch join de la {@link Persona} (relacion a uno: no afecta la
+     * paginacion en BD) reutilizado como join para filtrar y ordenar.
+     */
+    @SuppressWarnings("unchecked")
     public List<PersUsua> buscarPaginado(UsuarioFiltroDTO filtro, ParametrosBusqueda parametrosBusqueda) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
         CriteriaQuery<PersUsua> query = criteriaBuilder.createQuery(PersUsua.class);
         Root<PersUsua> raiz = query.from(PersUsua.class);
-        Join<PersUsua, Persona> persona = raiz.join("persona");
+        Join<PersUsua, Persona> persona = (Join<PersUsua, Persona>) raiz.<PersUsua, Persona>fetch("persona");
 
         query.where(construirPredicados(criteriaBuilder, raiz, persona, filtro).toArray(new Predicate[0]));
 

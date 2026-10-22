@@ -13,6 +13,7 @@ import com.saolan.soem.seguridad.modelo.PersUsua;
 
 import io.smallrye.jwt.build.Jwt;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 /**
  * Emision del access token (JWT firmado RS256, via smallrye-jwt-build) y
@@ -25,16 +26,20 @@ public class TokenServicio {
 
     private static final String CLAIM_PERMISOS = "permisos";
     private static final String CLAIM_SUCURSAL_ID = "sucursalId";
+    private static final String CLAIM_CLAVE_CADUCADA = "claveCaducada";
     private static final int BYTES_REFRESH_TOKEN = 32;
 
     private final SecureRandom generadorAleatorio = new SecureRandom();
 
+    @Inject
     @ConfigProperty(name = "mp.jwt.verify.issuer")
     private String emisor;
 
+    @Inject
     @ConfigProperty(name = "soem.jwt.access-token.duracion-minutos")
     private long duracionAccessTokenMinutos;
 
+    @Inject
     @ConfigProperty(name = "soem.jwt.refresh-token.duracion-dias")
     private long duracionRefreshTokenDias;
 
@@ -52,13 +57,14 @@ public class TokenServicio {
      * al emitir el token y viajan embebidos como claim (ver comentario de
      * diseno en {@code FiltroAutorizacion}).
      */
-    public String emitirAccessToken(PersUsua usuario, Set<String> permisos, Integer sucursalId) {
+    public String emitirAccessToken(PersUsua usuario, Set<String> permisos, Integer sucursalId, boolean claveCaducada) {
         return Jwt.claims()
                 .issuer(emisor)
                 .subject(String.valueOf(usuario.getPersonaId()))
                 .upn(usuario.getUsuari())
                 .claim(CLAIM_PERMISOS, permisos)
                 .claim(CLAIM_SUCURSAL_ID, sucursalId)
+                .claim(CLAIM_CLAVE_CADUCADA, claveCaducada)
                 .expiresIn(duracionAccessTokenMinutos * 60)
                 .sign();
     }

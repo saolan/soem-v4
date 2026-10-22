@@ -9,22 +9,25 @@ import jakarta.persistence.MappedSuperclass;
 /**
  * Campos de auditoria comunes a las tablas transaccionales del esquema.
  * <p>
- * {@code usuariRegi}/{@code fechaHoraRegi} los fija la aplicacion al insertar
- * y son inmutables despues. {@code usuariModi}/{@code fechaHoraModi} los
- * gobierna exclusivamente el trigger {@code trg_marca_modificacion()} en cada
- * UPDATE: la aplicacion nunca los escribe ({@code insertable = false},
- * {@code updatable = false}); tras modificar un registro, el Service debe
- * refrescar la entidad para leer los valores que dejo el trigger.
+ * Los cuatro los asigna exclusivamente PostgreSQL (migracion V6): al
+ * insertar, {@code DEFAULT soem_usuario_actual()} y {@code now()}; al
+ * modificar, el trigger {@code trg_marca_modificacion()}. El usuario es el
+ * autenticado en la API, publicado por
+ * {@code compartido.seguridad.InterceptorUsuarioAuditoria}. La aplicacion
+ * nunca los escribe ({@code insertable = false}, {@code updatable = false}):
+ * en una entidad recien persistida o modificada valen lo que se leyo de la
+ * BD; si un caso de uso necesita devolverlos, el Service debe hacer
+ * {@code flush()} + {@code refresh()} de la entidad.
  */
 @MappedSuperclass
 public abstract class EntidadAuditable implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Column(name = "usuari_regi", nullable = false, updatable = false)
+    @Column(name = "usuari_regi", nullable = false, insertable = false, updatable = false)
     private String usuariRegi;
 
-    @Column(name = "fecha_hora_regi", nullable = false, updatable = false)
+    @Column(name = "fecha_hora_regi", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime fechaHoraRegi;
 
     @Column(name = "usuari_modi", insertable = false, updatable = false)
@@ -37,16 +40,8 @@ public abstract class EntidadAuditable implements Serializable {
         return usuariRegi;
     }
 
-    public void setUsuariRegi(String usuariRegi) {
-        this.usuariRegi = usuariRegi;
-    }
-
     public OffsetDateTime getFechaHoraRegi() {
         return fechaHoraRegi;
-    }
-
-    public void setFechaHoraRegi(OffsetDateTime fechaHoraRegi) {
-        this.fechaHoraRegi = fechaHoraRegi;
     }
 
     public String getUsuariModi() {
