@@ -175,6 +175,16 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- SPI de RESTEasy (provided, lo aporta WildFly): solo para mapear
+             ResteasyViolationException, cuyo mapper incorporado responde con
+             su propio formato e incluye el valor rechazado. Ver
+             compartido.excepcion.ManejadorViolacionesValidacion. -->
+        <dependency>
+            <groupId>org.jboss.resteasy</groupId>
+            <artifactId>resteasy-core-spi</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- MicroProfile JWT: autenticacion Bearer segun AGENTS.md. La API es
              portable (provided); el runtime lo aporta el servidor WildFly 40
              con la capa microprofile-jwt-smallrye aprovisionada. -->

@@ -52,22 +52,33 @@ public class ManejadorGlobalExcepciones implements ExceptionMapper<Throwable> {
         }
 
         LOGGER.log(Level.SEVERE, "Error no controlado al procesar la solicitud", excepcion);
-        return construir(Response.Status.INTERNAL_SERVER_ERROR, MENSAJE_ERROR_INTERNO, List.of());
+        return respuestaErrorInterno();
     }
 
     private Response construirDesdeViolaciones(ConstraintViolationException excepcion) {
         List<ErrorCampo> errores = excepcion.getConstraintViolations().stream()
                 .map(violacion -> new ErrorCampo(nombreCampo(violacion.getPropertyPath().toString()), violacion.getMessage()))
                 .toList();
+        return respuestaDeValidacion(errores);
+    }
+
+    /** Respuesta 400 estandar para errores de Bean Validation (compartida con {@link ManejadorViolacionesValidacion}). */
+    static Response respuestaDeValidacion(List<ErrorCampo> errores) {
         return construir(Response.Status.BAD_REQUEST, "Error de validación en los datos enviados", errores);
     }
 
-    private String nombreCampo(String rutaPropiedad) {
+    /** Respuesta 500 generica, sin detalle tecnico. */
+    static Response respuestaErrorInterno() {
+        return construir(Response.Status.INTERNAL_SERVER_ERROR, MENSAJE_ERROR_INTERNO, List.of());
+    }
+
+    /** Ultimo segmento de una ruta de validacion: {@code crear.arg0.descri} &rarr; {@code descri}. */
+    static String nombreCampo(String rutaPropiedad) {
         int indice = rutaPropiedad.lastIndexOf('.');
         return indice >= 0 ? rutaPropiedad.substring(indice + 1) : rutaPropiedad;
     }
 
-    private Response construir(Response.Status estado, String mensaje, List<ErrorCampo> errores) {
+    private static Response construir(Response.Status estado, String mensaje, List<ErrorCampo> errores) {
         return Response.status(estado)
                 .type(MediaType.APPLICATION_JSON)
                 .entity(RespuestaApi.error(mensaje, errores))
