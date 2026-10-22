@@ -9,7 +9,27 @@
   Por cada rol_menu con acceso se agregan, con acceso, los grupos superiores
   que falten. Las filas existentes no se tocan: un grupo asignado
   explicitamente con acceso = false sigue ocultando su subarbol.
+
+  Antes se crea la unicidad (rol_id, menu_id): V1 solo la propone en su
+  bloque comentado y V3 aplico las de rol_perm, rol_sucu y rol_pers_usua,
+  no esta. La necesitan el ON CONFLICT de abajo y el reemplazo en bloque de
+  RolServicio. Si hay pares repetidos la migracion se detiene: elegir cual
+  conservar (pueden diferir en acceso) es una decision sobre los datos.
 ==============================================================================*/
+
+DO $dup$
+DECLARE
+  repetidos INT;
+BEGIN
+  SELECT count(*) INTO repetidos
+    FROM (SELECT 1 FROM rol_menu GROUP BY rol_id, menu_id HAVING count(*) > 1) d;
+  IF repetidos > 0 THEN
+    RAISE EXCEPTION 'rol_menu tiene % pares (rol_id, menu_id) repetidos; depurelos antes de aplicar V8', repetidos;
+  END IF;
+END $dup$;
+
+-- Un mismo menu no puede asignarse dos veces al mismo rol.
+ALTER TABLE rol_menu ADD CONSTRAINT uq_rol_menu_rol_menu UNIQUE (rol_id, menu_id);
 
 WITH RECURSIVE ancestros (rol_id, menu_id) AS (
     SELECT rm.rol_id, m.menu_supe_id
