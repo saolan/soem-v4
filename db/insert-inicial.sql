@@ -1040,6 +1040,8 @@
 	insert into rol_menu(rol_menu_id, rol_id, menu_id, acceso) values (166,24,13200,true);
 	insert into rol_menu(rol_menu_id, rol_id, menu_id, acceso) values (167,24,13250,true);
 	insert into rol_menu(rol_menu_id, rol_id, menu_id, acceso) values (168,20,11451,true);
+	insert into rol_menu(rol_menu_id, rol_id, menu_id, acceso) values (169,5,9750,true);
+	insert into rol_menu(rol_menu_id, rol_id, menu_id, acceso) values (170,6,9750,true);
 
 	insert into documento(documento_id, documento_supe_id, descri, numero, contab, format, copias, envia_correo, factor, estado) values (1, null, 'CJ-Abrir sesión ventas', 1, false, 'cajaMoviFormato1', 1, false, 1, true);
 	insert into documento(documento_id, documento_supe_id, descri, numero, contab, format, copias, envia_correo, factor, estado) values (2, null, 'CJ-Egresos de caja', 1, false, 'cajaMoviFormato1', 1, false, -1, true);

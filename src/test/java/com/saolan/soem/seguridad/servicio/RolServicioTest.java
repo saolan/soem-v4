@@ -34,6 +34,8 @@ import com.saolan.soem.seguridad.modelo.Menu;
 import com.saolan.soem.seguridad.modelo.Permiso;
 import com.saolan.soem.seguridad.modelo.Rol;
 import com.saolan.soem.seguridad.modelo.RolMenu;
+import com.saolan.soem.seguridad.modelo.RolPerm;
+import com.saolan.soem.seguridad.modelo.RolSucu;
 import com.saolan.soem.seguridad.repositorio.MenuRepositorio;
 import com.saolan.soem.seguridad.repositorio.PermisoRepositorio;
 import com.saolan.soem.seguridad.repositorio.RolRepositorio;
@@ -227,7 +229,72 @@ class RolServicioTest {
         assertEquals("menus", excepcion.getErrores().get(0).campo());
     }
 
+    @Test
+    void reemplazarPermisos_deberiaAplicarPorDiferencia() {
+        Rol rol = nuevoRol(1, "Rol Test", true);
+        RolPerm conservado = agregarPermiso(rol, nuevoPermiso(10, "sucursales", Accion.BUSCAR));
+        agregarPermiso(rol, nuevoPermiso(11, "sucursales", Accion.CREAR));
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(rol));
+
+        rolServicio.reemplazarPermisos(1, List.of(new AsignacionAccesoDTO(10, false)));
+
+        assertEquals(1, rol.getPermisos().size());
+        assertSame(conservado, rol.getPermisos().get(0));
+        assertFalse(conservado.getAcceso());
+        verify(permisoRepositorio, never()).buscarPorId(10);
+    }
+
+    @Test
+    void reemplazarSucursales_deberiaAplicarPorDiferencia() {
+        Rol rol = nuevoRol(1, "Rol Test", true);
+        RolSucu conservado = agregarSucursal(rol, nuevaSucursal(5));
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(rol));
+        when(sucursalRepositorio.buscarPorId(6)).thenReturn(Optional.of(nuevaSucursal(6)));
+
+        rolServicio.reemplazarSucursales(1, List.of(new AsignacionAccesoDTO(5, true), new AsignacionAccesoDTO(6, true)));
+
+        assertEquals(2, rol.getSucursales().size());
+        assertSame(conservado, rol.getSucursales().get(0));
+        verify(sucursalRepositorio, never()).buscarPorId(5);
+    }
+
+    @Test
+    void reemplazarPermisos_deberiaLanzarValidacion_cuandoElPermisoEstaRepetido() {
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(nuevoRol(1, "Rol Test", true)));
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class, () -> rolServicio.reemplazarPermisos(1,
+                List.of(new AsignacionAccesoDTO(10, true), new AsignacionAccesoDTO(10, true))));
+        assertEquals("permisos", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void reemplazarSucursales_deberiaLanzarValidacion_cuandoLaSucursalEstaRepetida() {
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(nuevoRol(1, "Rol Test", true)));
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class, () -> rolServicio.reemplazarSucursales(1,
+                List.of(new AsignacionAccesoDTO(5, true), new AsignacionAccesoDTO(5, false))));
+        assertEquals("sucursales", excepcion.getErrores().get(0).campo());
+    }
+
     // ---------- helpers ----------
+
+    private RolPerm agregarPermiso(Rol rol, Permiso permiso) {
+        RolPerm rolPerm = new RolPerm();
+        rolPerm.setRol(rol);
+        rolPerm.setPermiso(permiso);
+        rolPerm.setAcceso(true);
+        rol.getPermisos().add(rolPerm);
+        return rolPerm;
+    }
+
+    private RolSucu agregarSucursal(Rol rol, Sucursal sucursal) {
+        RolSucu rolSucu = new RolSucu();
+        rolSucu.setRol(rol);
+        rolSucu.setSucursal(sucursal);
+        rolSucu.setAcceso(true);
+        rol.getSucursales().add(rolSucu);
+        return rolSucu;
+    }
 
     private Menu nuevoMenu(Integer menuId) {
         Menu menu = new Menu();
