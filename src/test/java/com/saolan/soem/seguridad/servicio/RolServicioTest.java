@@ -2,7 +2,10 @@ package com.saolan.soem.seguridad.servicio;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -27,8 +30,13 @@ import com.saolan.soem.seguridad.dto.RolDTO;
 import com.saolan.soem.seguridad.dto.RolFiltroDTO;
 import com.saolan.soem.seguridad.mapeador.RolMapeador;
 import com.saolan.soem.seguridad.mapeador.RolMapeadorImpl;
+import com.saolan.soem.seguridad.modelo.Menu;
 import com.saolan.soem.seguridad.modelo.Permiso;
 import com.saolan.soem.seguridad.modelo.Rol;
+import com.saolan.soem.seguridad.modelo.RolMenu;
+import com.saolan.soem.seguridad.modelo.RolPerm;
+import com.saolan.soem.seguridad.modelo.RolSucu;
+import com.saolan.soem.seguridad.repositorio.MenuRepositorio;
 import com.saolan.soem.seguridad.repositorio.PermisoRepositorio;
 import com.saolan.soem.seguridad.repositorio.RolRepositorio;
 
@@ -49,6 +57,9 @@ class RolServicioTest {
 
     @Mock
     private SucursalRepositorio sucursalRepositorio;
+
+    @Mock
+    private MenuRepositorio menuRepositorio;
 
     @Spy
     private RolMapeador rolMapeador = new RolMapeadorImpl();
@@ -180,7 +191,128 @@ class RolServicioTest {
         assertEquals("sucursales", excepcion.getErrores().get(0).campo());
     }
 
+    @Test
+    void reemplazarMenus_deberiaAplicarPorDiferencia() {
+        Rol rol = nuevoRol(1, "Rol Test", true);
+        RolMenu conservado = agregarMenu(rol, nuevoMenu(10), true);
+        agregarMenu(rol, nuevoMenu(11), true);
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(rol));
+        when(menuRepositorio.buscarPorId(12)).thenReturn(Optional.of(nuevoMenu(12)));
+
+        rolServicio.reemplazarMenus(1, List.of(new AsignacionAccesoDTO(10, false), new AsignacionAccesoDTO(12, true)));
+
+        assertEquals(2, rol.getMenus().size());
+        assertSame(conservado, rol.getMenus().get(0));
+        assertFalse(conservado.getAcceso());
+        assertEquals(12, rol.getMenus().get(1).getMenu().getMenuId());
+        verify(menuRepositorio, never()).buscarPorId(10);
+    }
+
+    @Test
+    void reemplazarMenus_deberiaLanzarValidacion_cuandoElMenuNoExiste() {
+        Rol rol = nuevoRol(1, "Rol Test", true);
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(rol));
+        when(menuRepositorio.buscarPorId(99)).thenReturn(Optional.empty());
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class,
+                () -> rolServicio.reemplazarMenus(1, List.of(new AsignacionAccesoDTO(99, true))));
+        assertEquals("menus", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void reemplazarMenus_deberiaLanzarValidacion_cuandoElMenuEstaRepetido() {
+        Rol rol = nuevoRol(1, "Rol Test", true);
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(rol));
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class, () -> rolServicio.reemplazarMenus(1,
+                List.of(new AsignacionAccesoDTO(10, true), new AsignacionAccesoDTO(10, false))));
+        assertEquals("menus", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void reemplazarPermisos_deberiaAplicarPorDiferencia() {
+        Rol rol = nuevoRol(1, "Rol Test", true);
+        RolPerm conservado = agregarPermiso(rol, nuevoPermiso(10, "sucursales", Accion.BUSCAR));
+        agregarPermiso(rol, nuevoPermiso(11, "sucursales", Accion.CREAR));
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(rol));
+
+        rolServicio.reemplazarPermisos(1, List.of(new AsignacionAccesoDTO(10, false)));
+
+        assertEquals(1, rol.getPermisos().size());
+        assertSame(conservado, rol.getPermisos().get(0));
+        assertFalse(conservado.getAcceso());
+        verify(permisoRepositorio, never()).buscarPorId(10);
+    }
+
+    @Test
+    void reemplazarSucursales_deberiaAplicarPorDiferencia() {
+        Rol rol = nuevoRol(1, "Rol Test", true);
+        RolSucu conservado = agregarSucursal(rol, nuevaSucursal(5));
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(rol));
+        when(sucursalRepositorio.buscarPorId(6)).thenReturn(Optional.of(nuevaSucursal(6)));
+
+        rolServicio.reemplazarSucursales(1, List.of(new AsignacionAccesoDTO(5, true), new AsignacionAccesoDTO(6, true)));
+
+        assertEquals(2, rol.getSucursales().size());
+        assertSame(conservado, rol.getSucursales().get(0));
+        verify(sucursalRepositorio, never()).buscarPorId(5);
+    }
+
+    @Test
+    void reemplazarPermisos_deberiaLanzarValidacion_cuandoElPermisoEstaRepetido() {
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(nuevoRol(1, "Rol Test", true)));
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class, () -> rolServicio.reemplazarPermisos(1,
+                List.of(new AsignacionAccesoDTO(10, true), new AsignacionAccesoDTO(10, true))));
+        assertEquals("permisos", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void reemplazarSucursales_deberiaLanzarValidacion_cuandoLaSucursalEstaRepetida() {
+        when(rolRepositorio.buscarPorId(1)).thenReturn(Optional.of(nuevoRol(1, "Rol Test", true)));
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class, () -> rolServicio.reemplazarSucursales(1,
+                List.of(new AsignacionAccesoDTO(5, true), new AsignacionAccesoDTO(5, false))));
+        assertEquals("sucursales", excepcion.getErrores().get(0).campo());
+    }
+
     // ---------- helpers ----------
+
+    private RolPerm agregarPermiso(Rol rol, Permiso permiso) {
+        RolPerm rolPerm = new RolPerm();
+        rolPerm.setRol(rol);
+        rolPerm.setPermiso(permiso);
+        rolPerm.setAcceso(true);
+        rol.getPermisos().add(rolPerm);
+        return rolPerm;
+    }
+
+    private RolSucu agregarSucursal(Rol rol, Sucursal sucursal) {
+        RolSucu rolSucu = new RolSucu();
+        rolSucu.setRol(rol);
+        rolSucu.setSucursal(sucursal);
+        rolSucu.setAcceso(true);
+        rol.getSucursales().add(rolSucu);
+        return rolSucu;
+    }
+
+    private Menu nuevoMenu(Integer menuId) {
+        Menu menu = new Menu();
+        menu.setMenuId(menuId);
+        menu.setDescri("Menu Test");
+        menu.setDetall(Boolean.TRUE);
+        menu.setEstado(Boolean.TRUE);
+        return menu;
+    }
+
+    private RolMenu agregarMenu(Rol rol, Menu menu, boolean acceso) {
+        RolMenu rolMenu = new RolMenu();
+        rolMenu.setRol(rol);
+        rolMenu.setMenu(menu);
+        rolMenu.setAcceso(acceso);
+        rol.getMenus().add(rolMenu);
+        return rolMenu;
+    }
 
     private Rol nuevoRol(Integer rolId, String descri, boolean estado) {
         Rol rol = new Rol();

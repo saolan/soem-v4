@@ -12,8 +12,10 @@ import com.saolan.soem.compartido.seguridad.UtilidadClaims;
 import com.saolan.soem.seguridad.dto.CambioClaveDTO;
 import com.saolan.soem.seguridad.dto.CambioSucursalDTO;
 import com.saolan.soem.seguridad.dto.LoginRequestDTO;
+import com.saolan.soem.seguridad.dto.MenuNodoDTO;
 import com.saolan.soem.seguridad.dto.SesionActualDTO;
 import com.saolan.soem.seguridad.servicio.AutenticacionServicio;
+import com.saolan.soem.seguridad.servicio.MenuServicio;
 import com.saolan.soem.seguridad.servicio.ResultadoAutenticacion;
 import com.saolan.soem.seguridad.servicio.TokenServicio;
 
@@ -30,6 +32,7 @@ import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.CacheControl;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.NewCookie;
@@ -42,7 +45,7 @@ import jakarta.ws.rs.core.Response;
  * puede no existir o estar vencido, que es justamente el caso de uso de
  * {@code /refresh}); estos dos ultimos se autentican leyendo el refresh
  * token de la cookie, no del encabezado {@code Authorization}.
- * {@code /me}, {@code /cambiar-clave} y {@code /cambiar-sucursal} exigen un
+ * {@code /me}, {@code /menu}, {@code /cambiar-clave} y {@code /cambiar-sucursal} exigen un
  * access token valido (ver {@link #personaIdAutenticada()}).
  */
 @Path("/auth")
@@ -65,6 +68,9 @@ public class AuthControlador {
 
     @Inject
     private TokenServicio tokenServicio;
+
+    @Inject
+    private MenuServicio menuServicio;
 
     @Inject
     private JsonWebToken jsonWebToken;
@@ -137,6 +143,25 @@ public class AuthControlador {
         SesionActualDTO sesionActual = new SesionActualDTO(personaId, jsonWebToken.getName(), sucursalId, permisos,
                 claveCaducada);
         return Response.ok(RespuestaApi.exito(sesionActual)).build();
+    }
+
+    /**
+     * Menu lateral de la sesion para la sucursal activa del token. El
+     * frontend lo pide tras {@code /login}, {@code /refresh} y
+     * {@code /cambiar-sucursal}: como el token nuevo trae la sucursal
+     * elegida, el menu se recarga sin estado adicional en el servidor. Con
+     * la clave caducada el menu es vacio (el token no tiene permisos).
+     */
+    @GET
+    @Path("/menu")
+    public Response menu() {
+        Integer personaId = personaIdAutenticada();
+        List<MenuNodoDTO> menu = comoBooleano(jsonWebToken.getClaim(CLAIM_CLAVE_CADUCADA))
+                ? List.of()
+                : menuServicio.menuDeSesion(personaId, comoEntero(jsonWebToken.getClaim(CLAIM_SUCURSAL_ID)));
+        return Response.ok(RespuestaApi.exito(menu))
+                .cacheControl(sinCache())
+                .build();
     }
 
     /**
@@ -246,6 +271,15 @@ public class AuthControlador {
                 .secure(true)
                 .sameSite(NewCookie.SameSite.STRICT)
                 .build();
+    }
+
+    /** El menu depende del usuario y de la sucursal: ningun cache debe guardarlo. */
+    private CacheControl sinCache() {
+        CacheControl cacheControl = new CacheControl();
+        cacheControl.setNoStore(true);
+        cacheControl.setNoCache(true);
+        cacheControl.setPrivate(true);
+        return cacheControl;
     }
 
     private Integer comoEntero(Object valorClaim) {
