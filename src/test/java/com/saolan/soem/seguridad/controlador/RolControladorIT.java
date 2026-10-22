@@ -201,6 +201,20 @@ class RolControladorIT {
     }
 
     @Test
+    void reemplazarSucursales_deberiaAceptarReenviarLasMismasSucursales() {
+        Integer idRol = registrarRolParaLimpieza(crearRol());
+        List<AsignacionAccesoDTO> asignaciones = List.of(new AsignacionAccesoDTO(crearSucursalDirecta(), true));
+
+        for (int intento = 0; intento < 2; intento++) {
+            Response respuesta = target("api/v1/roles/" + idRol + "/sucursales")
+                    .request(MediaType.APPLICATION_JSON)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .put(Entity.entity(asignaciones, MediaType.APPLICATION_JSON));
+            assertEquals(200, respuesta.getStatus());
+        }
+    }
+
+    @Test
     void reemplazarSucursales_deberiaAsignarLasSucursalesAlRol() {
         Integer idRol = registrarRolParaLimpieza(crearRol());
         Integer idSucursal = crearSucursalDirecta();
