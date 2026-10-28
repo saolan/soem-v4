@@ -17,7 +17,6 @@ import com.saolan.soem.seguridad.dto.SesionActualDTO;
 import com.saolan.soem.seguridad.servicio.AutenticacionServicio;
 import com.saolan.soem.seguridad.servicio.MenuServicio;
 import com.saolan.soem.seguridad.servicio.ResultadoAutenticacion;
-import com.saolan.soem.seguridad.servicio.TokenServicio;
 
 import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
@@ -65,9 +64,6 @@ public class AuthControlador {
 
     @Inject
     private AutenticacionServicio autenticacionServicio;
-
-    @Inject
-    private TokenServicio tokenServicio;
 
     @Inject
     private MenuServicio menuServicio;
@@ -250,12 +246,18 @@ public class AuthControlador {
         return httpServletRequest.getContextPath() + RUTA_AUTH;
     }
 
+    /**
+     * Cookie de sesion (sin {@code Max-Age} ni {@code Expires}): el navegador
+     * la descarta al cerrarse, de modo que al reabrirlo se exige de nuevo
+     * usuario y clave. Con una cookie persistente, el {@code /refresh} que el
+     * frontend ejecuta al arrancar restauraba la sesion sin credenciales. La
+     * vigencia maxima del refresh token se sigue controlando en el servidor
+     * ({@code fecha_hora_expira}).
+     */
     private NewCookie construirCookieRefreshToken(String valor) {
-        int maxAgeSegundos = (int) (tokenServicio.duracionRefreshTokenDias() * 24 * 60 * 60);
         return new NewCookie.Builder(COOKIE_REFRESH_TOKEN)
                 .value(valor)
                 .path(rutaCookie())
-                .maxAge(maxAgeSegundos)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite(NewCookie.SameSite.STRICT)
