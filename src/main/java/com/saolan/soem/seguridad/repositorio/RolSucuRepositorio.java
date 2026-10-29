@@ -30,8 +30,9 @@ public class RolSucuRepositorio {
 
     /**
      * Sucursales activas a las que una persona tiene acceso a traves de sus
-     * roles activos, ordenadas con la matriz primero (criterio de
-     * desempate al elegir la sucursal activa por defecto en el login).
+     * roles activos, ordenadas con las matrices primero y luego por
+     * descripcion (criterio de desempate al elegir la sucursal activa por
+     * defecto en el login; puede haber varias matrices).
      */
     public List<Sucursal> resolverSucursalesAccesibles(Integer personaId) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();

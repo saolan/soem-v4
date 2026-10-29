@@ -38,8 +38,8 @@ import jakarta.transaction.UserTransaction;
  * <b>Precondición</b>: se asume una base de datos de pruebas dedicada, recién
  * migrada con Flyway. La tabla {@code sucursal} puede no estar vacía (p. ej.
  * la sucursal de {@code db/seed-usuario-prueba.sql}, con {@code matriz=false}
- * y ciudad "Ambato" a propósito, para no interferir con
- * {@code buscarMatrizActual} ni con los filtros por ciudad de este archivo):
+ * y ciudad "Ambato" a propósito, para no interferir con los filtros por
+ * ciudad de este archivo):
  * las aserciones sobre listados comparan por pertenencia
  * ({@code anyMatch}/{@code noneMatch}), no por tamaño total. No correr contra
  * un ambiente con datos de negocio reales de todos modos.
@@ -117,25 +117,6 @@ class SucursalRepositorioIT {
     }
 
     @Test
-    void buscarMatrizActual_deberiaEncontrarLaSucursalMarcadaComoMatriz() {
-        Sucursal matriz = crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), true));
-
-        Optional<Sucursal> resultado = sucursalRepositorio.buscarMatrizActual(null);
-
-        assertTrue(resultado.isPresent());
-        assertEquals(matriz.getSucursalId(), resultado.get().getSucursalId());
-    }
-
-    @Test
-    void buscarMatrizActual_deberiaExcluirIdIndicado() {
-        Sucursal matriz = crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), true));
-
-        Optional<Sucursal> resultado = sucursalRepositorio.buscarMatrizActual(matriz.getSucursalId());
-
-        assertTrue(resultado.isEmpty());
-    }
-
-    @Test
     void buscarPaginado_deberiaFiltrarPorCiudad() {
         crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false, "Quito"));
         crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false, "Guayaquil"));
@@ -145,6 +126,19 @@ class SucursalRepositorioIT {
 
         assertEquals(1, resultado.size());
         assertEquals("Quito", resultado.get(0).getCiudad());
+    }
+
+    @Test
+    void buscarPaginado_deberiaDevolverVariasMatrices_cuandoFiltraPorMatriz() {
+        Sucursal primera = crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), true));
+        Sucursal segunda = crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), true));
+
+        List<Sucursal> resultado = sucursalRepositorio.buscarPaginado(
+                new SucursalFiltroDTO(null, null, null, null, true, null),
+                new ParametrosBusqueda(1, 200, "descri", "asc"));
+
+        assertTrue(resultado.stream().anyMatch(s -> s.getSucursalId().equals(primera.getSucursalId())));
+        assertTrue(resultado.stream().anyMatch(s -> s.getSucursalId().equals(segunda.getSucursalId())));
     }
 
     @Test
