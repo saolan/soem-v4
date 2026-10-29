@@ -28,7 +28,7 @@ import jakarta.persistence.criteria.Root;
  * Acceso a datos de {@link Sucursal} mediante Criteria API: busqueda
  * paginada/filtrada, combo de solo lectura y las consultas auxiliares que
  * necesita {@code SucursalServicio} para sus reglas de negocio (unicidad de
- * codigo/ruc, singleton de matriz).
+ * codigo/ruc).
  */
 @ApplicationScoped
 public class SucursalRepositorio {
@@ -68,19 +68,6 @@ public class SucursalRepositorio {
 
         List<Predicate> predicados = new ArrayList<>();
         predicados.add(criteriaBuilder.equal(raiz.get("ruc"), ruc));
-        agregarExclusionId(criteriaBuilder, raiz, idExcluido, predicados);
-
-        query.where(predicados.toArray(new Predicate[0]));
-        return entityManager.createQuery(query).setMaxResults(1).getResultStream().findFirst();
-    }
-
-    public Optional<Sucursal> buscarMatrizActual(Integer idExcluido) {
-        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Sucursal> query = criteriaBuilder.createQuery(Sucursal.class);
-        Root<Sucursal> raiz = query.from(Sucursal.class);
-
-        List<Predicate> predicados = new ArrayList<>();
-        predicados.add(criteriaBuilder.isTrue(raiz.get("matriz")));
         agregarExclusionId(criteriaBuilder, raiz, idExcluido, predicados);
 
         query.where(predicados.toArray(new Predicate[0]));

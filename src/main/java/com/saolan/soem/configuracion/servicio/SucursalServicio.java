@@ -33,8 +33,7 @@ import jakarta.transaction.Transactional;
 /**
  * Reglas de negocio del agregado {@link Sucursal}: unicidad de
  * {@code codigo}/{@code ruc} (restricciones documentadas en el DDL pero no
- * declaradas en la base de datos), singleton de {@code matriz} y la
- * composiciones con {@link SucuCertEmis} (1:1) y {@link SucuBode} (1:N),
+ * declaradas en la base de datos) y las composiciones con {@link SucuCertEmis} (1:1) y {@link SucuBode} (1:N),
  * expuestas como sub-recursos independientes
  * ({@code /sucursales/{id}/certificado-emision} y
  * {@code /sucursales/{id}/bodegas}) pero administradas siempre dentro de la
@@ -82,11 +81,6 @@ public class SucursalServicio {
         validarUnicidad(sucursalDTO.codigo(), sucursalDTO.ruc(), null);
 
         Sucursal sucursal = sucursalMapeador.aSucursal(sucursalDTO);
-
-        if (Boolean.TRUE.equals(sucursal.getMatriz())) {
-            desmarcarMatrizActual(null);
-        }
-
         sucursalRepositorio.crear(sucursal);
         return sucursalMapeador.aSucursalDTO(sucursal);
     }
@@ -97,11 +91,6 @@ public class SucursalServicio {
         validarUnicidad(sucursalDTO.codigo(), sucursalDTO.ruc(), sucursalId);
 
         sucursalMapeador.actualizarEntidadDesdeDto(sucursalDTO, sucursal);
-
-        if (Boolean.TRUE.equals(sucursal.getMatriz())) {
-            desmarcarMatrizActual(sucursalId);
-        }
-
         return sucursalMapeador.aSucursalDTO(sucursal);
     }
 
@@ -127,11 +116,6 @@ public class SucursalServicio {
         if (!errores.isEmpty()) {
             throw new ExcepcionConflicto("La sucursal entra en conflicto con datos existentes", errores);
         }
-    }
-
-    private void desmarcarMatrizActual(Integer idExcluido) {
-        sucursalRepositorio.buscarMatrizActual(idExcluido)
-                .ifPresent(actual -> actual.setMatriz(Boolean.FALSE));
     }
 
     /**
