@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -84,7 +86,6 @@ class SucursalServicioTest {
         assertEquals("S001", resultado.codigo());
         assertEquals("1234567890001", resultado.ruc());
         verify(sucursalRepositorio).crear(any(Sucursal.class));
-        verify(sucursalRepositorio, never()).buscarMatrizActual(any());
     }
 
     @Test
@@ -125,16 +126,18 @@ class SucursalServicioTest {
     }
 
     @Test
-    void crear_deberiaDesmarcarMatrizAnterior_cuandoNuevaEsMatriz() {
+    void crear_deberiaPermitirVariasMatrices_cuandoNuevaEsMatriz() {
         SucursalDTO dto = crearSucursalDTO(null, "S001", "1234567890001", true);
-        Sucursal matrizAnterior = crearSucursalEntidad(5, "S000", "9999999999999", true, true);
         when(sucursalRepositorio.buscarPorCodigo("S001", null)).thenReturn(Optional.empty());
         when(sucursalRepositorio.buscarPorRuc("1234567890001", null)).thenReturn(Optional.empty());
-        when(sucursalRepositorio.buscarMatrizActual(null)).thenReturn(Optional.of(matrizAnterior));
 
-        sucursalServicio.crear(dto);
+        SucursalDTO resultado = sucursalServicio.crear(dto);
 
-        assertFalse(matrizAnterior.getMatriz());
+        assertTrue(resultado.matriz());
+        verify(sucursalRepositorio).buscarPorCodigo("S001", null);
+        verify(sucursalRepositorio).buscarPorRuc("1234567890001", null);
+        verify(sucursalRepositorio).crear(any(Sucursal.class));
+        verifyNoMoreInteractions(sucursalRepositorio);
     }
 
     // ---------- modificar ----------
@@ -174,18 +177,20 @@ class SucursalServicioTest {
     }
 
     @Test
-    void modificar_deberiaDesmarcarMatrizAnterior_cuandoPasaASerMatriz() {
+    void modificar_deberiaConservarOtrasMatrices_cuandoPasaASerMatriz() {
         Sucursal existente = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
-        Sucursal matrizAnterior = crearSucursalEntidad(5, "S000", "9999999999999", true, true);
         SucursalDTO dto = crearSucursalDTO(1, "S001", "1234567890001", true);
         when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(existente));
         when(sucursalRepositorio.buscarPorCodigo("S001", 1)).thenReturn(Optional.empty());
         when(sucursalRepositorio.buscarPorRuc("1234567890001", 1)).thenReturn(Optional.empty());
-        when(sucursalRepositorio.buscarMatrizActual(1)).thenReturn(Optional.of(matrizAnterior));
 
         sucursalServicio.modificar(1, dto);
 
-        assertFalse(matrizAnterior.getMatriz());
+        assertTrue(existente.getMatriz());
+        verify(sucursalRepositorio).buscarPorId(1);
+        verify(sucursalRepositorio).buscarPorCodigo("S001", 1);
+        verify(sucursalRepositorio).buscarPorRuc("1234567890001", 1);
+        verifyNoMoreInteractions(sucursalRepositorio);
     }
 
     // ---------- eliminar ----------
