@@ -212,6 +212,63 @@ class SucursalServicioTest {
         assertThrows(ExcepcionNoEncontrado.class, () -> sucursalServicio.eliminar(99));
     }
 
+    // ---------- estado (solo eliminar/activar) ----------
+
+    @Test
+    void crear_deberiaCrearActiva_aunqueElDtoIndiqueInactiva() {
+        SucursalDTO dto = crearSucursalDTO(null, "S001", "1234567890001", false, false);
+        when(sucursalRepositorio.buscarPorCodigo("S001", null)).thenReturn(Optional.empty());
+        when(sucursalRepositorio.buscarPorRuc("1234567890001", null)).thenReturn(Optional.empty());
+
+        SucursalDTO resultado = sucursalServicio.crear(dto);
+
+        assertTrue(resultado.estado());
+    }
+
+    @Test
+    void modificar_noDeberiaDesactivar_cuandoElDtoIndicaInactiva() {
+        Sucursal existente = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
+        SucursalDTO dto = crearSucursalDTO(1, "S001", "1234567890001", false, false);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(existente));
+        when(sucursalRepositorio.buscarPorCodigo("S001", 1)).thenReturn(Optional.empty());
+        when(sucursalRepositorio.buscarPorRuc("1234567890001", 1)).thenReturn(Optional.empty());
+
+        sucursalServicio.modificar(1, dto);
+
+        assertTrue(existente.getEstado());
+    }
+
+    @Test
+    void modificar_noDeberiaReactivar_cuandoElDtoIndicaActiva() {
+        Sucursal existente = crearSucursalEntidad(1, "S001", "1234567890001", false, false);
+        SucursalDTO dto = crearSucursalDTO(1, "S001", "1234567890001", false, true);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(existente));
+        when(sucursalRepositorio.buscarPorCodigo("S001", 1)).thenReturn(Optional.empty());
+        when(sucursalRepositorio.buscarPorRuc("1234567890001", 1)).thenReturn(Optional.empty());
+
+        sucursalServicio.modificar(1, dto);
+
+        assertFalse(existente.getEstado());
+    }
+
+    @Test
+    void activar_deberiaMarcarEstadoTrue() {
+        Sucursal existente = crearSucursalEntidad(1, "S001", "1234567890001", false, false);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(existente));
+
+        SucursalDTO resultado = sucursalServicio.activar(1);
+
+        assertTrue(existente.getEstado());
+        assertTrue(resultado.estado());
+    }
+
+    @Test
+    void activar_deberiaLanzarNoEncontrado_cuandoNoExiste() {
+        when(sucursalRepositorio.buscarPorId(99)).thenReturn(Optional.empty());
+
+        assertThrows(ExcepcionNoEncontrado.class, () -> sucursalServicio.activar(99));
+    }
+
     // ---------- consultas ----------
 
     @Test
@@ -479,10 +536,14 @@ class SucursalServicioTest {
     }
 
     private SucursalDTO crearSucursalDTO(Integer sucursalId, String codigo, String ruc, boolean matriz) {
+        return crearSucursalDTO(sucursalId, codigo, ruc, matriz, true);
+    }
+
+    private SucursalDTO crearSucursalDTO(Integer sucursalId, String codigo, String ruc, boolean matriz, Boolean estado) {
         return new SucursalDTO(sucursalId, codigo, matriz, "Sucursal Test", ruc, "Razón Social Test",
                 null, "Quito", "Av. de Prueba 123", "Av. de Prueba 123", "0999999999", null,
                 "correo@test.com", "Representante Test", "0999999999", "Dirección Representante Test",
-                ruc, null, null, null, true);
+                ruc, null, null, null, estado);
     }
 
     private Sucursal crearSucursalEntidad(Integer sucursalId, String codigo, String ruc, boolean matriz, boolean estado) {

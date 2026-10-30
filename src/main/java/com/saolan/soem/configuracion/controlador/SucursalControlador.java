@@ -112,6 +112,15 @@ public class SucursalControlador {
         return Response.ok(RespuestaApi.<Void>exito(null, "Sucursal eliminada correctamente")).build();
     }
 
+    /** Reactiva una sucursal eliminada: mismo permiso que el borrado logico. */
+    @PUT
+    @Path("/{id}/activar")
+    @RequierePermiso(recurso = RECURSO, accion = Accion.ELIMINAR)
+    public Response activar(@PathParam("id") Integer id) {
+        SucursalDTO activada = sucursalServicio.activar(id);
+        return Response.ok(RespuestaApi.exito(activada, "Sucursal activada correctamente")).build();
+    }
+
     @GET
     @Path("/{id}/certificado-emision")
     @RequierePermiso(recurso = RECURSO, accion = Accion.BUSCAR)

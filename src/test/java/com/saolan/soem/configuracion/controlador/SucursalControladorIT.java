@@ -210,6 +210,49 @@ class SucursalControladorIT {
     }
 
     @Test
+    void modificar_noDeberiaCambiarEstado_cuandoElCuerpoIndicaInactiva() {
+        Response respuestaCrear = crear(sucursalDTO(null, codigoAleatorio(), rucAleatorio(), false));
+        Integer id = registrarParaLimpieza(respuestaCrear);
+        SucursalDTO inactiva = sucursalDTO(id, codigoAleatorio(), rucAleatorio(), false, false);
+
+        Response respuestaModificar = target("api/v1/sucursales/" + id)
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .put(Entity.entity(inactiva, MediaType.APPLICATION_JSON));
+
+        assertEquals(200, respuestaModificar.getStatus());
+        RespuestaApi<SucursalDTO> cuerpo = respuestaModificar.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { });
+        assertTrue(cuerpo.datos().estado());
+    }
+
+    @Test
+    void activar_deberiaReactivarSucursalEliminada() {
+        Response respuestaCrear = crear(sucursalDTO(null, codigoAleatorio(), rucAleatorio(), false));
+        Integer id = registrarParaLimpieza(respuestaCrear);
+        target("api/v1/sucursales/" + id)
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .delete()
+                .close();
+
+        Response respuestaActivar = target("api/v1/sucursales/" + id + "/activar")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .put(Entity.json(""));
+
+        assertEquals(200, respuestaActivar.getStatus());
+        RespuestaApi<SucursalDTO> cuerpo = respuestaActivar.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { });
+        assertTrue(cuerpo.datos().estado());
+    }
+
+    @Test
+    void crear_conRucDe10Digitos_deberiaRetornar400() {
+        Response respuesta = crear(sucursalDTO(null, codigoAleatorio(), "1790012345", false));
+
+        assertEquals(400, respuesta.getStatus());
+    }
+
+    @Test
     void certificadoEmision_deberiaCrearseLeerseYEliminarse() {
         Response respuestaCombo = target("api/v1/certificados-emisor/combo")
                 .request(MediaType.APPLICATION_JSON)
@@ -268,10 +311,14 @@ class SucursalControladorIT {
     }
 
     private SucursalDTO sucursalDTO(Integer sucursalId, String codigo, String ruc, boolean matriz) {
+        return sucursalDTO(sucursalId, codigo, ruc, matriz, true);
+    }
+
+    private SucursalDTO sucursalDTO(Integer sucursalId, String codigo, String ruc, boolean matriz, Boolean estado) {
         return new SucursalDTO(sucursalId, codigo, matriz, "Sucursal de prueba", ruc, "Razón Social de Prueba",
                 null, "Quito", "Av. de Prueba 123", "Av. de Prueba 123", "0999999999", null,
                 "prueba@test.com", "Representante de Prueba", "0999999999", "Dirección Representante de Prueba",
-                ruc, null, null, null, true);
+                ruc, null, null, null, estado);
     }
 
     private String codigoAleatorio() {

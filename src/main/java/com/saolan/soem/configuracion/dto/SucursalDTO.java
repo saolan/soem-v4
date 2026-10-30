@@ -14,6 +14,9 @@ import jakarta.validation.constraints.Size;
  * distinto al alta/edicion de los datos generales de la sucursal.
  *
  * @param sucursalId identificador; ignorado en el cuerpo de POST/PUT
+ * @param estado     de solo lectura; ignorado en el cuerpo de POST/PUT (toda
+ *                   sucursal nace activa y solo cambia con {@code DELETE} y
+ *                   {@code /activar})
  */
 public record SucursalDTO(
 
@@ -31,7 +34,7 @@ public record SucursalDTO(
         String descri,
 
         @NotBlank(message = "El RUC es obligatorio")
-        @Pattern(regexp = "^[0-9]{10,13}$", message = "El RUC debe tener entre 10 y 13 dígitos numéricos")
+        @Pattern(regexp = "^[0-9]{13}$", message = "El RUC debe tener exactamente 13 dígitos numéricos")
         String ruc,
 
         @NotBlank(message = "La razón social es obligatoria")
@@ -78,7 +81,7 @@ public record SucursalDTO(
         String represDire,
 
         @NotBlank(message = "El RUC contable es obligatorio")
-        @Size(max = 13, message = "El RUC contable no puede superar los 13 caracteres")
+        @Pattern(regexp = "^[0-9]{13}$", message = "El RUC contable debe tener exactamente 13 dígitos numéricos")
         String rucCont,
 
         @Size(max = 13, message = "El contribuyente especial no puede superar los 13 caracteres")
@@ -89,6 +92,5 @@ public record SucursalDTO(
         @Size(max = 255, message = "La ruta del logotipo no puede superar los 255 caracteres")
         String logoti,
 
-        @NotNull(message = "El estado es obligatorio")
         Boolean estado) {
 }
