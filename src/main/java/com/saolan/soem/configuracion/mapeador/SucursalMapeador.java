@@ -17,11 +17,17 @@ import com.saolan.soem.configuracion.modelo.Sucursal;
  * ignora explicitamente en ambas direcciones DTO -&gt; entidad para que
  * MapStruct no reporte "unmapped target property", ya que la entidad
  * {@link Sucursal} si tiene ese campo.
+ * <p>
+ * {@code estado} es de solo lectura en la API: se ignora en ambas
+ * direcciones DTO -&gt; entidad para que el permiso {@code modificar} no
+ * permita desactivar (o reactivar) una sucursal; solo cambia mediante
+ * {@code DELETE} y {@code /activar}, protegidos con {@code eliminar}.
  */
 @Mapper(componentModel = "cdi")
 public interface SucursalMapeador {
 
     @Mapping(target = "sucursalId", ignore = true)
+    @Mapping(target = "estado", ignore = true)
     @Mapping(target = "certificadoEmisor", ignore = true)
     @Mapping(target = "bodegas", ignore = true)
     Sucursal aSucursal(SucursalDTO sucursalDTO);
@@ -30,6 +36,7 @@ public interface SucursalMapeador {
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "sucursalId", ignore = true)
+    @Mapping(target = "estado", ignore = true)
     @Mapping(target = "certificadoEmisor", ignore = true)
     @Mapping(target = "bodegas", ignore = true)
     void actualizarEntidadDesdeDto(SucursalDTO sucursalDTO, @MappingTarget Sucursal sucursal);

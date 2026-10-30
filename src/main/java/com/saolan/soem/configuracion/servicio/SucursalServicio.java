@@ -33,7 +33,10 @@ import jakarta.transaction.Transactional;
 /**
  * Reglas de negocio del agregado {@link Sucursal}: unicidad de
  * {@code codigo}/{@code ruc} (restricciones documentadas en el DDL pero no
- * declaradas en la base de datos) y las composiciones con {@link SucuCertEmis} (1:1) y {@link SucuBode} (1:N),
+ * declaradas en la base de datos), {@code estado} gestionado solo por
+ * {@link #eliminar(Integer)} y {@link #activar(Integer)} (nunca desde el
+ * DTO, para que {@code modificar} no equivalga a {@code eliminar}) y las
+ * composiciones con {@link SucuCertEmis} (1:1) y {@link SucuBode} (1:N),
  * expuestas como sub-recursos independientes
  * ({@code /sucursales/{id}/certificado-emision} y
  * {@code /sucursales/{id}/bodegas}) pero administradas siempre dentro de la
@@ -81,6 +84,7 @@ public class SucursalServicio {
         validarUnicidad(sucursalDTO.codigo(), sucursalDTO.ruc(), null);
 
         Sucursal sucursal = sucursalMapeador.aSucursal(sucursalDTO);
+        sucursal.setEstado(Boolean.TRUE);
         sucursalRepositorio.crear(sucursal);
         return sucursalMapeador.aSucursalDTO(sucursal);
     }
@@ -98,6 +102,14 @@ public class SucursalServicio {
     public void eliminar(Integer sucursalId) {
         Sucursal sucursal = obtenerOFallar(sucursalId);
         sucursal.setEstado(Boolean.FALSE);
+    }
+
+    /** Revierte el borrado logico; idempotente si ya estaba activa. */
+    @Transactional
+    public SucursalDTO activar(Integer sucursalId) {
+        Sucursal sucursal = obtenerOFallar(sucursalId);
+        sucursal.setEstado(Boolean.TRUE);
+        return sucursalMapeador.aSucursalDTO(sucursal);
     }
 
     private Sucursal obtenerOFallar(Integer sucursalId) {
