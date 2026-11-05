@@ -81,6 +81,9 @@ class AutenticacionServicioTest {
     @InjectMocks
     private AutenticacionServicio autenticacionServicio;
 
+    private static final long INACTIVIDAD_REFRESH_MINUTOS = 35L;
+    private static final long INACTIVIDAD_SESION_SEGUNDOS = 1800L;
+
     // ---------- login ----------
 
     @Test
@@ -95,7 +98,8 @@ class AutenticacionServicioTest {
         when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo-123");
         when(tokenServicio.hashearRefreshToken("refresh-crudo-123")).thenReturn("hash-refresh-123");
         when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
-        when(tokenServicio.duracionRefreshTokenDias()).thenReturn(7L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
         ResultadoAutenticacion resultado = autenticacionServicio.login(
                 new LoginRequestDTO("usuario.test", "clave-correcta", null), "127.0.0.1", "JUnit");
@@ -108,7 +112,8 @@ class AutenticacionServicioTest {
         assertEquals("usuario.test", resultado.respuesta().usuario().usuari());
         assertFalse(resultado.respuesta().claveCaducada());
         assertEquals(List.of(new ComboDTO(10, "Sucursal Test")), resultado.respuesta().sucursales());
-        verify(refreshTokenRepositorio).crear(any());
+        assertEquals(1800L, resultado.respuesta().inactividadSegundos());
+        assertExpiraPorInactividad(capturarRefreshTokenCreado());
     }
 
     @Test
@@ -124,7 +129,8 @@ class AutenticacionServicioTest {
         when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo");
         when(tokenServicio.hashearRefreshToken("refresh-crudo")).thenReturn("hash-refresh");
         when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
-        when(tokenServicio.duracionRefreshTokenDias()).thenReturn(7L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
         ResultadoAutenticacion resultado = autenticacionServicio.login(
                 new LoginRequestDTO("usuario.test", "clave-correcta", null), null, null);
@@ -205,7 +211,8 @@ class AutenticacionServicioTest {
         when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("nuevo-refresh-crudo");
         when(tokenServicio.hashearRefreshToken("nuevo-refresh-crudo")).thenReturn("hash-nuevo-refresh");
         when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
-        when(tokenServicio.duracionRefreshTokenDias()).thenReturn(7L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
         ResultadoAutenticacion resultado = autenticacionServicio.refrescar("token-crudo", "127.0.0.1", "JUnit");
 
@@ -213,10 +220,11 @@ class AutenticacionServicioTest {
         assertEquals("rotacion", tokenActual.getMotivoRevocacion());
         assertEquals("nuevo-access-token", resultado.respuesta().accessToken());
         assertEquals(10, resultado.respuesta().sucursalId());
+        assertEquals(1800L, resultado.respuesta().inactividadSegundos());
 
-        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
-        verify(refreshTokenRepositorio).crear(captor.capture());
-        assertEquals(tokenActual, captor.getValue().getTokenPadre());
+        RefreshToken nuevo = capturarRefreshTokenCreado();
+        assertEquals(tokenActual, nuevo.getTokenPadre());
+        assertExpiraPorInactividad(nuevo);
     }
 
     @Test
@@ -255,6 +263,70 @@ class AutenticacionServicioTest {
         assertThrows(ExcepcionNoAutenticado.class, () -> autenticacionServicio.refrescar("token-crudo", null, null));
     }
 
+    /** Sesion abandonada: el ultimo uso fue hace mas de los 35 minutos de inactividad permitidos. */
+    @Test
+    void refrescar_deberiaLanzarNoAutenticadoSinRotar_cuandoVencioPorInactividad() {
+        PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash", true);
+        RefreshToken tokenActual = nuevoRefreshToken(usuario, null, false, OffsetDateTime.now().minusSeconds(1));
+        tokenActual.setFechaHoraEmision(OffsetDateTime.now().minusMinutes(INACTIVIDAD_REFRESH_MINUTOS).minusSeconds(1));
+        when(tokenServicio.hashearRefreshToken("token-crudo")).thenReturn("hash-inactivo");
+        when(refreshTokenRepositorio.buscarPorHash("hash-inactivo")).thenReturn(Optional.of(tokenActual));
+
+        assertThrows(ExcepcionNoAutenticado.class, () -> autenticacionServicio.refrescar("token-crudo", null, null));
+        assertFalse(tokenActual.getRevocado());
+        verify(refreshTokenRepositorio, never()).crear(any());
+        verify(refreshTokenRepositorio, never()).buscarVigentesDePersona(any());
+    }
+
+    @Test
+    void refrescar_noDeberiaRevocarTodasLasSesiones_cuandoElTokenSeRotoDentroDelMargenDeGracia() {
+        asignarGraciaReuso(30L);
+        PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash", true);
+        RefreshToken tokenRotado = nuevoRefreshToken(usuario, null, true, OffsetDateTime.now().plusMinutes(30));
+        tokenRotado.setMotivoRevocacion("rotacion");
+        tokenRotado.setFechaHoraRevocado(OffsetDateTime.now().minusSeconds(5));
+        when(tokenServicio.hashearRefreshToken("token-recien-rotado")).thenReturn("hash-rotado");
+        when(refreshTokenRepositorio.buscarPorHash("hash-rotado")).thenReturn(Optional.of(tokenRotado));
+
+        assertThrows(ExcepcionNoAutenticado.class,
+                () -> autenticacionServicio.refrescar("token-recien-rotado", null, null));
+        verify(refreshTokenRepositorio, never()).buscarVigentesDePersona(any());
+        verify(refreshTokenRepositorio, never()).crear(any());
+    }
+
+    @Test
+    void refrescar_deberiaTratarComoReuso_cuandoLaRotacionSuperaElMargenDeGracia() {
+        asignarGraciaReuso(30L);
+        PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash", true);
+        RefreshToken tokenRotado = nuevoRefreshToken(usuario, null, true, OffsetDateTime.now().plusMinutes(30));
+        tokenRotado.setMotivoRevocacion("rotacion");
+        tokenRotado.setFechaHoraRevocado(OffsetDateTime.now().minusSeconds(31));
+        RefreshToken vigente = nuevoRefreshToken(usuario, null, false, OffsetDateTime.now().plusMinutes(30));
+        when(tokenServicio.hashearRefreshToken("token-viejo")).thenReturn("hash-rotado");
+        when(refreshTokenRepositorio.buscarPorHash("hash-rotado")).thenReturn(Optional.of(tokenRotado));
+        when(refreshTokenRepositorio.buscarVigentesDePersona(1)).thenReturn(List.of(vigente));
+
+        assertThrows(ExcepcionNoAutenticado.class, () -> autenticacionServicio.refrescar("token-viejo", null, null));
+        assertTrue(vigente.getRevocado());
+        assertEquals("reuso_detectado", vigente.getMotivoRevocacion());
+    }
+
+    /** El margen solo cubre rotaciones: un token cerrado por logout reutilizado sigue siendo reuso. */
+    @Test
+    void refrescar_deberiaTratarComoReuso_cuandoElTokenRecienteFueRevocadoPorLogout() {
+        asignarGraciaReuso(30L);
+        PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash", true);
+        RefreshToken tokenCerrado = nuevoRefreshToken(usuario, null, true, OffsetDateTime.now().plusMinutes(30));
+        tokenCerrado.setMotivoRevocacion("logout");
+        tokenCerrado.setFechaHoraRevocado(OffsetDateTime.now().minusSeconds(5));
+        when(tokenServicio.hashearRefreshToken("token-cerrado")).thenReturn("hash-cerrado");
+        when(refreshTokenRepositorio.buscarPorHash("hash-cerrado")).thenReturn(Optional.of(tokenCerrado));
+        when(refreshTokenRepositorio.buscarVigentesDePersona(1)).thenReturn(List.of());
+
+        assertThrows(ExcepcionNoAutenticado.class, () -> autenticacionServicio.refrescar("token-cerrado", null, null));
+        verify(refreshTokenRepositorio).buscarVigentesDePersona(1);
+    }
+
     @Test
     void refrescar_deberiaLanzarNoAutenticado_cuandoElUsuarioEstaInactivo() {
         PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash", false);
@@ -279,7 +351,8 @@ class AutenticacionServicioTest {
         when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo");
         when(tokenServicio.hashearRefreshToken("refresh-crudo")).thenReturn("hash-refresh");
         when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
-        when(tokenServicio.duracionRefreshTokenDias()).thenReturn(7L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
         ResultadoAutenticacion resultado = autenticacionServicio.refrescar("token-crudo", null, null);
 
@@ -340,7 +413,8 @@ class AutenticacionServicioTest {
         when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo");
         when(tokenServicio.hashearRefreshToken("refresh-crudo")).thenReturn("hash-refresh");
         when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
-        when(tokenServicio.duracionRefreshTokenDias()).thenReturn(7L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
         ResultadoAutenticacion resultado = autenticacionServicio.cambiarSucursal(1, "token-crudo", 20, null, null);
 
@@ -348,11 +422,12 @@ class AutenticacionServicioTest {
         assertEquals(2, resultado.respuesta().sucursales().size());
         assertTrue(tokenActual.getRevocado());
         assertEquals("cambio_sucursal", tokenActual.getMotivoRevocacion());
+        assertEquals(1800L, resultado.respuesta().inactividadSegundos());
 
-        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
-        verify(refreshTokenRepositorio).crear(captor.capture());
-        assertEquals(20, captor.getValue().getSucursal().getSucursalId());
-        assertEquals(tokenActual, captor.getValue().getTokenPadre());
+        RefreshToken nuevo = capturarRefreshTokenCreado();
+        assertEquals(20, nuevo.getSucursal().getSucursalId());
+        assertEquals(tokenActual, nuevo.getTokenPadre());
+        assertExpiraPorInactividad(nuevo);
     }
 
     @Test
@@ -435,7 +510,8 @@ class AutenticacionServicioTest {
         when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo");
         when(tokenServicio.hashearRefreshToken("refresh-crudo")).thenReturn("hash-refresh");
         when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
-        when(tokenServicio.duracionRefreshTokenDias()).thenReturn(7L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
         Optional<ResultadoAutenticacion> resultado = autenticacionServicio.cambiarClave(1,
                 new CambioClaveDTO("clave-actual", "clave-nueva-segura"), "token-crudo", null, null);
@@ -445,6 +521,8 @@ class AutenticacionServicioTest {
         assertEquals(List.of("caja-crud:buscar"), resultado.get().respuesta().permisos());
         assertTrue(sesionActual.getRevocado());
         assertEquals("cambio_clave", sesionActual.getMotivoRevocacion());
+        assertEquals(1800L, resultado.get().respuesta().inactividadSegundos());
+        assertExpiraPorInactividad(capturarRefreshTokenCreado());
     }
 
     @Test
@@ -477,6 +555,31 @@ class AutenticacionServicioTest {
     }
 
     // ---------- helpers ----------
+
+    private RefreshToken capturarRefreshTokenCreado() {
+        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepositorio).crear(captor.capture());
+        return captor.getValue();
+    }
+
+    /** Vencimiento deslizante: fechaHoraExpira = fechaHoraEmision + 35 minutos de inactividad, exacto. */
+    private void assertExpiraPorInactividad(RefreshToken token) {
+        assertEquals(token.getFechaHoraEmision().plusMinutes(INACTIVIDAD_REFRESH_MINUTOS), token.getFechaHoraExpira());
+        OffsetDateTime ahora = OffsetDateTime.now();
+        assertFalse(token.getFechaHoraEmision().isAfter(ahora));
+        assertTrue(token.getFechaHoraEmision().isAfter(ahora.minusSeconds(5)));
+    }
+
+    /** {@code @InjectMocks} no resuelve {@code @ConfigProperty}: el margen queda en 0 salvo que el test lo fije. */
+    private void asignarGraciaReuso(long segundos) {
+        try {
+            Field campo = AutenticacionServicio.class.getDeclaredField("graciaReusoSegundos");
+            campo.setAccessible(true);
+            campo.setLong(autenticacionServicio, segundos);
+        } catch (ReflectiveOperationException excepcion) {
+            throw new IllegalStateException(excepcion);
+        }
+    }
 
     private Persona nuevaPersona(Integer personaId) {
         Persona persona = new Persona();

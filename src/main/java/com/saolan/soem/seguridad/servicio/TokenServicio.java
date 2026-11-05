@@ -6,12 +6,15 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import com.saolan.soem.seguridad.modelo.PersUsua;
 
 import io.smallrye.jwt.build.Jwt;
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -23,6 +26,8 @@ import jakarta.inject.Inject;
  */
 @ApplicationScoped
 public class TokenServicio {
+
+    private static final Logger LOGGER = Logger.getLogger(TokenServicio.class.getName());
 
     private static final String CLAIM_PERMISOS = "permisos";
     private static final String CLAIM_SUCURSAL_ID = "sucursalId";
@@ -39,16 +44,48 @@ public class TokenServicio {
     @ConfigProperty(name = "soem.jwt.access-token.duracion-minutos")
     private long duracionAccessTokenMinutos;
 
+    /**
+     * Vencimiento deslizante del refresh token: cada emision o rotacion lo
+     * fija en {@code ahora + inactividad}, de modo que la sesion caduca
+     * cuando el usuario deja de usar el sistema ese tiempo.
+     */
     @Inject
-    @ConfigProperty(name = "soem.jwt.refresh-token.duracion-dias")
-    private long duracionRefreshTokenDias;
+    @ConfigProperty(name = "soem.jwt.refresh-token.inactividad-minutos")
+    private long inactividadRefreshTokenMinutos;
+
+    /** Segundos sin uso tras los que el frontend cierra la sesion (se informa en {@code LoginRespuestaDTO}). */
+    @Inject
+    @ConfigProperty(name = "soem.jwt.sesion.inactividad-segundos")
+    private long inactividadSesionSegundos;
+
+    /**
+     * Falla el despliegue ante una configuracion incoherente en lugar de
+     * emitir sesiones que vencen al instante.
+     */
+    @PostConstruct
+    void validarConfiguracion() {
+        if (duracionAccessTokenMinutos <= 0 || inactividadRefreshTokenMinutos <= 0 || inactividadSesionSegundos <= 0) {
+            throw new IllegalStateException(
+                    "La duración del access token y los tiempos de inactividad de la sesión deben ser positivos");
+        }
+        if (inactividadRefreshTokenMinutos * 60 <= inactividadSesionSegundos) {
+            // El servidor debe vencer despues del frontend para que el usuario vea siempre el aviso previo.
+            LOGGER.log(Level.WARNING,
+                    "La inactividad del refresh token ({0} min) no supera la inactividad del frontend ({1} s)",
+                    new Object[] { inactividadRefreshTokenMinutos, inactividadSesionSegundos });
+        }
+    }
 
     public long duracionAccessTokenMinutos() {
         return duracionAccessTokenMinutos;
     }
 
-    public long duracionRefreshTokenDias() {
-        return duracionRefreshTokenDias;
+    public long inactividadRefreshTokenMinutos() {
+        return inactividadRefreshTokenMinutos;
+    }
+
+    public long inactividadSesionSegundos() {
+        return inactividadSesionSegundos;
     }
 
     /**
