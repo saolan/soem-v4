@@ -82,6 +82,10 @@ public class AutenticacionServicio {
     @ConfigProperty(name = "soem.jwt.refresh-token.retencion-dias", defaultValue = "30")
     private long retencionRefreshTokenDias;
 
+    @Inject
+    @ConfigProperty(name = "soem.jwt.refresh-token.gracia-reuso-segundos", defaultValue = "30")
+    private long graciaReusoSegundos;
+
     @Transactional
     public ResultadoAutenticacion login(LoginRequestDTO request, String ipOrigen, String agenteUsuario) {
         Optional<PersUsua> usuarioActivo = usuarioRepositorio.buscarPorUsuari(request.usuario())
@@ -216,13 +220,24 @@ public class AutenticacionServicio {
     /**
      * Valida el refresh token de la cookie: debe existir, no estar revocado
      * (si lo esta, es un reuso y se revocan todas las sesiones de la
-     * persona), no estar expirado y pertenecer a un usuario activo.
+     * persona), no estar expirado (vencimiento por inactividad) y pertenecer
+     * a un usuario activo.
+     * <p>
+     * Excepcion al reuso: un token rotado hace menos de
+     * {@code soem.jwt.refresh-token.gracia-reuso-segundos} se rechaza sin
+     * revocar nada, porque lo habitual es una carrera legitima (dos pestanas
+     * o una recarga durante la renovacion) y no un robo.
      */
     private RefreshToken validarRefreshVigente(String refreshTokenCrudo, String ipOrigen) {
         String hash = tokenServicio.hashearRefreshToken(refreshTokenCrudo);
         RefreshToken tokenActual = refreshTokenRepositorio.buscarPorHash(hash)
                 .orElseThrow(() -> new ExcepcionNoAutenticado(MENSAJE_SESION_INVALIDA));
 
+        if (Boolean.TRUE.equals(tokenActual.getRevocado()) && esRotacionReciente(tokenActual)) {
+            LOGGER.log(Level.INFO, "Refresh token recién rotado reutilizado dentro del margen de gracia: usuario={0}, ip={1}",
+                    new Object[] { tokenActual.getUsuario().getUsuari(), ipOrigen });
+            throw new ExcepcionNoAutenticado(MENSAJE_SESION_INVALIDA);
+        }
         if (Boolean.TRUE.equals(tokenActual.getRevocado())) {
             revocarTodosVigentes(tokenActual.getUsuario().getPersonaId(), MOTIVO_REUSO);
             LOGGER.log(Level.WARNING, "Reuso de refresh token detectado: usuario={0}, ip={1}",
@@ -236,6 +251,14 @@ public class AutenticacionServicio {
             throw new ExcepcionNoAutenticado(MENSAJE_SESION_INVALIDA);
         }
         return tokenActual;
+    }
+
+    private boolean esRotacionReciente(RefreshToken token) {
+        OffsetDateTime fechaHoraRevocado = token.getFechaHoraRevocado();
+        return graciaReusoSegundos > 0
+                && MOTIVO_ROTACION.equals(token.getMotivoRevocacion())
+                && fechaHoraRevocado != null
+                && fechaHoraRevocado.isAfter(OffsetDateTime.now().minusSeconds(graciaReusoSegundos));
     }
 
     /** Variante silenciosa: sin cookie o con una cookie no vigente de esa persona devuelve vacio, sin revocar nada. */
@@ -266,7 +289,7 @@ public class AutenticacionServicio {
         refreshToken.setTokenPadre(tokenPadre);
         refreshToken.setTokenHash(tokenServicio.hashearRefreshToken(refreshTokenCrudo));
         refreshToken.setFechaHoraEmision(ahora);
-        refreshToken.setFechaHoraExpira(ahora.plusDays(tokenServicio.duracionRefreshTokenDias()));
+        refreshToken.setFechaHoraExpira(ahora.plusMinutes(tokenServicio.inactividadRefreshTokenMinutos()));
         refreshToken.setRevocado(Boolean.FALSE);
         refreshToken.setIpOrigen(ipOrigen);
         refreshToken.setAgenteUsuario(agenteUsuario);
@@ -283,7 +306,8 @@ public class AutenticacionServicio {
                 sucursales,
                 usuarioMapeador.aUsuarioDTO(usuario),
                 permisos.stream().sorted().toList(),
-                claveCaducada);
+                claveCaducada,
+                tokenServicio.inactividadSesionSegundos());
 
         return new ResultadoAutenticacion(respuesta, refreshTokenCrudo);
     }

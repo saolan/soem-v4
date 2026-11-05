@@ -18,6 +18,9 @@ import com.saolan.soem.compartido.dto.ComboDTO;
  *                      emite sin permisos, de modo que solo puede usarse
  *                      para {@code /auth/cambiar-clave}, {@code /auth/me} y
  *                      {@code /auth/logout}
+ * @param inactividadSegundos segundos sin uso tras los que el frontend
+ *                      cierra la sesion; el servidor vence el refresh token
+ *                      con un margen adicional
  */
 public record LoginRespuestaDTO(
         String accessToken,
@@ -26,5 +29,6 @@ public record LoginRespuestaDTO(
         List<ComboDTO> sucursales,
         UsuarioDTO usuario,
         List<String> permisos,
-        boolean claveCaducada) {
+        boolean claveCaducada,
+        long inactividadSegundos) {
 }
