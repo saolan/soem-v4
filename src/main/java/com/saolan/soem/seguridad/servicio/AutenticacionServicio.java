@@ -103,7 +103,7 @@ public class AutenticacionServicio {
         }
 
         List<Sucursal> sucursalesAccesibles = rolSucuRepositorio.resolverSucursalesAccesibles(usuario.getPersonaId());
-        Sucursal sucursalActiva = resolverSucursalActiva(request.sucursalId(), sucursalesAccesibles);
+        Sucursal sucursalActiva = resolverSucursalInicial(sucursalesAccesibles);
 
         LOGGER.log(Level.INFO, "Inicio de sesión exitoso: usuario={0}, ip={1}",
                 new Object[] { usuario.getUsuari(), ipOrigen });
@@ -154,7 +154,7 @@ public class AutenticacionServicio {
         }
 
         List<Sucursal> sucursalesAccesibles = rolSucuRepositorio.resolverSucursalesAccesibles(personaId);
-        Sucursal sucursalActiva = resolverSucursalActiva(sucursalId, sucursalesAccesibles);
+        Sucursal sucursalActiva = resolverSucursalSolicitada(sucursalId, sucursalesAccesibles);
 
         revocar(tokenActual, MOTIVO_CAMBIO_SUCURSAL);
         return emitirSesion(usuario, sucursalActiva, sucursalesAccesibles, ipOrigen, agenteUsuario, tokenActual);
@@ -276,7 +276,11 @@ public class AutenticacionServicio {
     private ResultadoAutenticacion emitirSesion(PersUsua usuario, Sucursal sucursalActiva, List<Sucursal> sucursalesAccesibles,
             String ipOrigen, String agenteUsuario, RefreshToken tokenPadre) {
         boolean claveCaducada = esClaveCaducada(usuario);
-        Set<String> permisos = claveCaducada ? Set.of() : rolPermRepositorio.resolverPermisosDePersona(usuario.getPersonaId());
+        // Sin sucursal elegida el token no lleva permisos: nada puede registrarse en una sucursal no confirmada.
+        boolean requiereSeleccionSucursal = sucursalActiva == null;
+        Set<String> permisos = claveCaducada || requiereSeleccionSucursal
+                ? Set.of()
+                : rolPermRepositorio.resolverPermisosDePersona(usuario.getPersonaId());
         Integer sucursalId = sucursalActiva == null ? null : sucursalActiva.getSucursalId();
 
         String accessToken = tokenServicio.emitirAccessToken(usuario, permisos, sucursalId, claveCaducada);
@@ -307,7 +311,8 @@ public class AutenticacionServicio {
                 usuarioMapeador.aUsuarioDTO(usuario),
                 permisos.stream().sorted().toList(),
                 claveCaducada,
-                tokenServicio.inactividadSesionSegundos());
+                tokenServicio.inactividadSesionSegundos(),
+                requiereSeleccionSucursal);
 
         return new ResultadoAutenticacion(respuesta, refreshTokenCrudo);
     }
@@ -339,22 +344,40 @@ public class AutenticacionServicio {
         return valor == null ? null : valor.replaceAll("[\\r\\n\\t]", "_");
     }
 
-    private Sucursal resolverSucursalActiva(Integer sucursalIdSolicitada, List<Sucursal> sucursalesAccesibles) {
-        if (sucursalesAccesibles.isEmpty()) {
-            throw new ExcepcionValidacion("El usuario no tiene acceso a ninguna sucursal habilitada",
-                    List.of(new ErrorCampo("sucursalId", "El usuario no tiene acceso a ninguna sucursal habilitada")));
-        }
-        if (sucursalIdSolicitada == null) {
-            return sucursalesAccesibles.get(0);
-        }
+    /**
+     * Sucursal con la que arranca una sesion sin eleccion previa: si el
+     * usuario tiene una sola, esa; si tiene varias, {@code null} (seleccion
+     * pendiente). Nunca se elige una por defecto entre varias, para que el
+     * usuario no registre datos en una sucursal que no confirmo.
+     */
+    private Sucursal resolverSucursalInicial(List<Sucursal> sucursalesAccesibles) {
+        validarSucursalesAccesibles(sucursalesAccesibles);
+        return sucursalesAccesibles.size() == 1 ? sucursalesAccesibles.get(0) : null;
+    }
+
+    private Sucursal resolverSucursalSolicitada(Integer sucursalIdSolicitada, List<Sucursal> sucursalesAccesibles) {
+        validarSucursalesAccesibles(sucursalesAccesibles);
         return sucursalesAccesibles.stream()
-                .filter(sucursal -> sucursalIdSolicitada.equals(sucursal.getSucursalId()))
+                .filter(sucursal -> sucursal.getSucursalId().equals(sucursalIdSolicitada))
                 .findFirst()
                 .orElseThrow(() -> new ExcepcionValidacion("No tiene acceso a la sucursal solicitada",
                         List.of(new ErrorCampo("sucursalId", "No tiene acceso a la sucursal solicitada"))));
     }
 
-    /** Mantiene la sucursal activa previa si sigue siendo accesible; si no, recae en la resolucion por defecto. */
+    private void validarSucursalesAccesibles(List<Sucursal> sucursalesAccesibles) {
+        if (sucursalesAccesibles.isEmpty()) {
+            throw new ExcepcionValidacion("El usuario no tiene acceso a ninguna sucursal habilitada",
+                    List.of(new ErrorCampo("sucursalId", "El usuario no tiene acceso a ninguna sucursal habilitada")));
+        }
+    }
+
+    /**
+     * Mantiene la sucursal activa previa si sigue siendo accesible. Si no la
+     * hay (seleccion aun pendiente) o se perdio el acceso a ella, aplica
+     * {@link #resolverSucursalInicial}: con varias sucursales la sesion
+     * vuelve a quedar pendiente de seleccion en lugar de pasar en silencio a
+     * otra sucursal.
+     */
     private Sucursal mantenerOReasignarSucursal(Sucursal sucursalPrevia, List<Sucursal> sucursalesAccesibles) {
         if (sucursalPrevia != null) {
             Integer idPrevio = sucursalPrevia.getSucursalId();
@@ -365,6 +388,6 @@ public class AutenticacionServicio {
                 return mantenida.get();
             }
         }
-        return resolverSucursalActiva(null, sucursalesAccesibles);
+        return resolverSucursalInicial(sucursalesAccesibles);
     }
 }

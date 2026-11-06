@@ -1,8 +1,10 @@
 package com.saolan.soem.seguridad.controlador;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.seguridad.dto.CambioClaveDTO;
 import com.saolan.soem.seguridad.dto.CambioSucursalDTO;
 import com.saolan.soem.seguridad.dto.LoginRequestDTO;
@@ -67,6 +70,7 @@ class AuthControladorIT {
         }
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(AuthControladorIT.class.getPackage());
+        war.addClass(SesionPrueba.class);
         return war;
     }
 
@@ -82,7 +86,7 @@ class AuthControladorIT {
         Response respuestaLogin = login(USUARIO_PRUEBA, CLAVE_PRUEBA);
         assumeTrue(respuestaLogin.getStatus() == 200,
                 "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' ya cargado en la base");
-        accessToken = cuerpoLogin(respuestaLogin).accessToken();
+        accessToken = SesionPrueba.accessTokenConSucursal(respuestaLogin, this::target);
     }
 
     @AfterEach
@@ -173,7 +177,16 @@ class AuthControladorIT {
         LoginRespuestaDTO cuerpo = cuerpoLogin(login(USUARIO_PRUEBA, CLAVE_PRUEBA));
 
         assertNotNull(cuerpo.sucursales());
-        assertTrue(cuerpo.sucursales().stream().anyMatch(s -> s.valor().equals(cuerpo.sucursalId())));
+        assertFalse(cuerpo.sucursales().isEmpty());
+        if (cuerpo.sucursales().size() > 1) {
+            // Varias sucursales: el login no entra a ninguna hasta que el usuario elija.
+            assertTrue(cuerpo.requiereSeleccionSucursal());
+            assertNull(cuerpo.sucursalId());
+            assertTrue(cuerpo.permisos().isEmpty());
+        } else {
+            assertFalse(cuerpo.requiereSeleccionSucursal());
+            assertEquals(cuerpo.sucursales().get(0).valor(), cuerpo.sucursalId());
+        }
     }
 
     @Test
@@ -229,7 +242,7 @@ class AuthControladorIT {
     private Response login(String usuario, String clave) {
         return target("api/v1/auth/login")
                 .request(MediaType.APPLICATION_JSON)
-                .post(Entity.entity(new LoginRequestDTO(usuario, clave, null), MediaType.APPLICATION_JSON));
+                .post(Entity.entity(new LoginRequestDTO(usuario, clave), MediaType.APPLICATION_JSON));
     }
 
     private LoginRespuestaDTO cuerpoLogin(Response respuesta) {

@@ -28,11 +28,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
 import com.saolan.soem.configuracion.dto.SucursalDTO;
 import com.saolan.soem.configuracion.modelo.Sucursal;
 import com.saolan.soem.seguridad.dto.LoginRequestDTO;
-import com.saolan.soem.seguridad.dto.LoginRespuestaDTO;
 
 import jakarta.annotation.Resource;
 import jakarta.persistence.EntityManager;
@@ -75,6 +75,7 @@ class SucursalControladorIT {
         }
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(SucursalControladorIT.class.getPackage());
+        war.addClass(SesionPrueba.class);
         return war;
     }
 
@@ -95,7 +96,7 @@ class SucursalControladorIT {
     void iniciarSesion() {
         cliente = ClientBuilder.newClient();
 
-        LoginRequestDTO credenciales = new LoginRequestDTO(USUARIO_PRUEBA, CLAVE_PRUEBA, null);
+        LoginRequestDTO credenciales = new LoginRequestDTO(USUARIO_PRUEBA, CLAVE_PRUEBA);
         Response respuestaLogin = target("api/v1/auth/login")
                 .request(MediaType.APPLICATION_JSON)
                 .post(Entity.entity(credenciales, MediaType.APPLICATION_JSON));
@@ -103,8 +104,7 @@ class SucursalControladorIT {
         assumeTrue(respuestaLogin.getStatus() == 200,
                 "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' con permisos de configuracion-crud ya cargado en la base");
 
-        RespuestaApi<LoginRespuestaDTO> cuerpo = respuestaLogin.readEntity(new GenericType<RespuestaApi<LoginRespuestaDTO>>() { });
-        accessToken = cuerpo.datos().accessToken();
+        accessToken = SesionPrueba.accessTokenConSucursal(respuestaLogin, this::target);
     }
 
     @AfterEach

@@ -137,7 +137,7 @@ public class AuthControlador {
         boolean claveCaducada = comoBooleano(jsonWebToken.getClaim(CLAIM_CLAVE_CADUCADA));
 
         SesionActualDTO sesionActual = new SesionActualDTO(personaId, jsonWebToken.getName(), sucursalId, permisos,
-                claveCaducada);
+                claveCaducada, sucursalId == null);
         return Response.ok(RespuestaApi.exito(sesionActual)).build();
     }
 
