@@ -24,8 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.seguridad.dto.LoginRequestDTO;
-import com.saolan.soem.seguridad.dto.LoginRespuestaDTO;
 import com.saolan.soem.seguridad.dto.RolDTO;
 import com.saolan.soem.seguridad.dto.UsuarioCreacionDTO;
 import com.saolan.soem.seguridad.dto.UsuarioDTO;
@@ -69,6 +69,7 @@ class UsuarioControladorIT {
         }
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(UsuarioControladorIT.class.getPackage());
+        war.addClass(SesionPrueba.class);
         return war;
     }
 
@@ -91,10 +92,10 @@ class UsuarioControladorIT {
         cliente = ClientBuilder.newClient();
         Response respuestaLogin = target("api/v1/auth/login")
                 .request(MediaType.APPLICATION_JSON)
-                .post(Entity.entity(new LoginRequestDTO(USUARIO_PRUEBA, CLAVE_PRUEBA, null), MediaType.APPLICATION_JSON));
+                .post(Entity.entity(new LoginRequestDTO(USUARIO_PRUEBA, CLAVE_PRUEBA), MediaType.APPLICATION_JSON));
         assumeTrue(respuestaLogin.getStatus() == 200,
                 "Requiere el usuario de prueba '" + USUARIO_PRUEBA + "' con permisos de seguridad-crud ya cargado en la base");
-        accessToken = respuestaLogin.readEntity(new GenericType<RespuestaApi<LoginRespuestaDTO>>() { }).datos().accessToken();
+        accessToken = SesionPrueba.accessTokenConSucursal(respuestaLogin, this::target);
     }
 
     @AfterEach
