@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +17,7 @@ import static org.mockito.Mockito.when;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -102,7 +105,7 @@ class AutenticacionServicioTest {
         when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
         ResultadoAutenticacion resultado = autenticacionServicio.login(
-                new LoginRequestDTO("usuario.test", "clave-correcta", null), "127.0.0.1", "JUnit");
+                new LoginRequestDTO("usuario.test", "clave-correcta"), "127.0.0.1", "JUnit");
 
         assertEquals("refresh-crudo-123", resultado.refreshTokenCrudo());
         assertEquals("access-token-123", resultado.respuesta().accessToken());
@@ -133,7 +136,7 @@ class AutenticacionServicioTest {
         when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
         ResultadoAutenticacion resultado = autenticacionServicio.login(
-                new LoginRequestDTO("usuario.test", "clave-correcta", null), null, null);
+                new LoginRequestDTO("usuario.test", "clave-correcta"), null, null);
 
         assertTrue(resultado.respuesta().claveCaducada());
         assertTrue(resultado.respuesta().permisos().isEmpty());
@@ -145,7 +148,7 @@ class AutenticacionServicioTest {
         when(usuarioRepositorio.buscarPorUsuari("desconocido")).thenReturn(Optional.empty());
 
         assertThrows(ExcepcionNoAutenticado.class,
-                () -> autenticacionServicio.login(new LoginRequestDTO("desconocido", "clave", null), null, null));
+                () -> autenticacionServicio.login(new LoginRequestDTO("desconocido", "clave"), null, null));
         verify(claveServicio).simularVerificacion("clave");
         verify(claveServicio, never()).verificar(any(), any());
     }
@@ -156,7 +159,7 @@ class AutenticacionServicioTest {
         when(usuarioRepositorio.buscarPorUsuari("usuario.test")).thenReturn(Optional.of(usuario));
 
         assertThrows(ExcepcionNoAutenticado.class,
-                () -> autenticacionServicio.login(new LoginRequestDTO("usuario.test", "clave", null), null, null));
+                () -> autenticacionServicio.login(new LoginRequestDTO("usuario.test", "clave"), null, null));
         verify(claveServicio).simularVerificacion("clave");
         verify(claveServicio, never()).verificar(any(), any());
     }
@@ -168,7 +171,7 @@ class AutenticacionServicioTest {
         when(claveServicio.verificar("clave-incorrecta", "hash-almacenado")).thenReturn(false);
 
         assertThrows(ExcepcionNoAutenticado.class,
-                () -> autenticacionServicio.login(new LoginRequestDTO("usuario.test", "clave-incorrecta", null), null, null));
+                () -> autenticacionServicio.login(new LoginRequestDTO("usuario.test", "clave-incorrecta"), null, null));
         verify(rolSucuRepositorio, never()).resolverSucursalesAccesibles(any());
     }
 
@@ -180,20 +183,55 @@ class AutenticacionServicioTest {
         when(rolSucuRepositorio.resolverSucursalesAccesibles(1)).thenReturn(List.of());
 
         ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class,
-                () -> autenticacionServicio.login(new LoginRequestDTO("usuario.test", "clave-correcta", null), null, null));
+                () -> autenticacionServicio.login(new LoginRequestDTO("usuario.test", "clave-correcta"), null, null));
         assertEquals("sucursalId", excepcion.getErrores().get(0).campo());
     }
 
+    /** Con varias sucursales no se entra a ninguna por defecto: la sesion queda sin sucursal ni permisos. */
     @Test
-    void login_deberiaLanzarValidacion_cuandoLaSucursalSolicitadaNoEsAccesible() {
+    void login_deberiaDejarLaSeleccionPendiente_cuandoTieneVariasSucursales() {
+        PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash-almacenado", true);
+        when(usuarioRepositorio.buscarPorUsuari("usuario.test")).thenReturn(Optional.of(usuario));
+        when(claveServicio.verificar("clave-correcta", "hash-almacenado")).thenReturn(true);
+        when(rolSucuRepositorio.resolverSucursalesAccesibles(1)).thenReturn(List.of(nuevaSucursal(10), nuevaSucursal(20)));
+        when(tokenServicio.emitirAccessToken(any(), eq(Set.of()), isNull(), eq(false))).thenReturn("access-token");
+        when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo");
+        when(tokenServicio.hashearRefreshToken("refresh-crudo")).thenReturn("hash-refresh");
+        when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
+
+        ResultadoAutenticacion resultado = autenticacionServicio.login(
+                new LoginRequestDTO("usuario.test", "clave-correcta"), null, null);
+
+        assertTrue(resultado.respuesta().requiereSeleccionSucursal());
+        assertNull(resultado.respuesta().sucursalId());
+        assertTrue(resultado.respuesta().permisos().isEmpty());
+        assertEquals(2, resultado.respuesta().sucursales().size());
+        assertNull(capturarRefreshTokenCreado().getSucursal());
+        verify(rolPermRepositorio, never()).resolverPermisosDePersona(any());
+    }
+
+    @Test
+    void login_deberiaEntrarDirecto_cuandoTieneUnaSolaSucursal() {
         PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash-almacenado", true);
         when(usuarioRepositorio.buscarPorUsuari("usuario.test")).thenReturn(Optional.of(usuario));
         when(claveServicio.verificar("clave-correcta", "hash-almacenado")).thenReturn(true);
         when(rolSucuRepositorio.resolverSucursalesAccesibles(1)).thenReturn(List.of(nuevaSucursal(10)));
+        when(rolPermRepositorio.resolverPermisosDePersona(1)).thenReturn(Set.of("caja-crud:buscar"));
+        when(tokenServicio.emitirAccessToken(any(), any(), eq(10), eq(false))).thenReturn("access-token");
+        when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo");
+        when(tokenServicio.hashearRefreshToken("refresh-crudo")).thenReturn("hash-refresh");
+        when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
 
-        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class, () -> autenticacionServicio.login(
-                new LoginRequestDTO("usuario.test", "clave-correcta", 99), null, null));
-        assertEquals("sucursalId", excepcion.getErrores().get(0).campo());
+        ResultadoAutenticacion resultado = autenticacionServicio.login(
+                new LoginRequestDTO("usuario.test", "clave-correcta"), null, null);
+
+        assertFalse(resultado.respuesta().requiereSeleccionSucursal());
+        assertEquals(10, resultado.respuesta().sucursalId());
+        assertEquals(List.of("caja-crud:buscar"), resultado.respuesta().permisos());
     }
 
     // ---------- refrescar ----------
@@ -360,6 +398,37 @@ class AutenticacionServicioTest {
     }
 
     /**
+     * Renovar no debe saltarse la seleccion: tanto si aun no se eligio
+     * (sucursal previa nula) como si se perdio el acceso a la elegida, con
+     * varias sucursales la sesion vuelve a quedar pendiente.
+     */
+    @Test
+    void refrescar_deberiaMantenerLaSeleccionPendiente_cuandoNoHaySucursalVigenteYTieneVarias() {
+        PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash", true);
+        for (Sucursal sucursalPrevia : Arrays.asList(null, nuevaSucursal(99))) {
+            clearInvocations(refreshTokenRepositorio);
+            RefreshToken tokenActual = nuevoRefreshToken(usuario, sucursalPrevia, false, OffsetDateTime.now().plusMinutes(30));
+            when(tokenServicio.hashearRefreshToken("token-crudo")).thenReturn("hash-actual");
+            when(refreshTokenRepositorio.buscarPorHash("hash-actual")).thenReturn(Optional.of(tokenActual));
+            when(rolSucuRepositorio.resolverSucursalesAccesibles(1)).thenReturn(List.of(nuevaSucursal(10), nuevaSucursal(20)));
+            when(tokenServicio.emitirAccessToken(any(), eq(Set.of()), isNull(), eq(false))).thenReturn("access-token");
+            when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo");
+            when(tokenServicio.hashearRefreshToken("refresh-crudo")).thenReturn("hash-refresh");
+            when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
+            when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+            when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
+
+            ResultadoAutenticacion resultado = autenticacionServicio.refrescar("token-crudo", null, null);
+
+            assertTrue(resultado.respuesta().requiereSeleccionSucursal(), "previa=" + sucursalPrevia);
+            assertNull(resultado.respuesta().sucursalId());
+            assertTrue(resultado.respuesta().permisos().isEmpty());
+            assertNull(capturarRefreshTokenCreado().getSucursal());
+        }
+        verify(rolPermRepositorio, never()).resolverPermisosDePersona(any());
+    }
+
+    /**
      * La revocacion por reuso ocurre antes de lanzar ExcepcionNoAutenticado:
      * si la transaccion hiciera rollback, el token robado seguiria vigente.
      */
@@ -428,6 +497,31 @@ class AutenticacionServicioTest {
         assertEquals(20, nuevo.getSucursal().getSucursalId());
         assertEquals(tokenActual, nuevo.getTokenPadre());
         assertExpiraPorInactividad(nuevo);
+    }
+
+    /** Segundo paso del login: desde la sesion pendiente se elige la sucursal y se obtienen los permisos. */
+    @Test
+    void cambiarSucursal_deberiaCompletarLaSesion_cuandoLaSeleccionEstabaPendiente() {
+        PersUsua usuario = nuevoUsuario(1, "usuario.test", "hash", true);
+        RefreshToken tokenPendiente = nuevoRefreshToken(usuario, null, false, OffsetDateTime.now().plusMinutes(30));
+        when(tokenServicio.hashearRefreshToken("token-crudo")).thenReturn("hash-actual");
+        when(refreshTokenRepositorio.buscarPorHash("hash-actual")).thenReturn(Optional.of(tokenPendiente));
+        when(rolSucuRepositorio.resolverSucursalesAccesibles(1)).thenReturn(List.of(nuevaSucursal(10), nuevaSucursal(20)));
+        when(rolPermRepositorio.resolverPermisosDePersona(1)).thenReturn(Set.of("caja-crud:buscar"));
+        when(tokenServicio.emitirAccessToken(any(), eq(Set.of("caja-crud:buscar")), eq(20), eq(false))).thenReturn("access-token");
+        when(tokenServicio.generarRefreshTokenCrudo()).thenReturn("refresh-crudo");
+        when(tokenServicio.hashearRefreshToken("refresh-crudo")).thenReturn("hash-refresh");
+        when(tokenServicio.duracionAccessTokenMinutos()).thenReturn(15L);
+        when(tokenServicio.inactividadRefreshTokenMinutos()).thenReturn(INACTIVIDAD_REFRESH_MINUTOS);
+        when(tokenServicio.inactividadSesionSegundos()).thenReturn(INACTIVIDAD_SESION_SEGUNDOS);
+
+        ResultadoAutenticacion resultado = autenticacionServicio.cambiarSucursal(1, "token-crudo", 20, null, null);
+
+        assertFalse(resultado.respuesta().requiereSeleccionSucursal());
+        assertEquals(20, resultado.respuesta().sucursalId());
+        assertEquals(List.of("caja-crud:buscar"), resultado.respuesta().permisos());
+        assertTrue(tokenPendiente.getRevocado());
+        assertEquals(20, capturarRefreshTokenCreado().getSucursal().getSucursalId());
     }
 
     @Test

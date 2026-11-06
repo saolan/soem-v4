@@ -14,6 +14,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import com.saolan.soem.seguridad.modelo.PersUsua;
 
 import io.smallrye.jwt.build.Jwt;
+import io.smallrye.jwt.build.JwtClaimsBuilder;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -93,17 +94,21 @@ public class TokenServicio {
      * resueltos por {@code AutenticacionServicio}: se calculan una unica vez
      * al emitir el token y viajan embebidos como claim (ver comentario de
      * diseno en {@code FiltroAutorizacion}).
+     * <p>
+     * {@code sucursalId} nulo (seleccion de sucursal pendiente): el claim se
+     * omite en lugar de emitirse con valor nulo.
      */
     public String emitirAccessToken(PersUsua usuario, Set<String> permisos, Integer sucursalId, boolean claveCaducada) {
-        return Jwt.claims()
+        JwtClaimsBuilder claims = Jwt.claims()
                 .issuer(emisor)
                 .subject(String.valueOf(usuario.getPersonaId()))
                 .upn(usuario.getUsuari())
                 .claim(CLAIM_PERMISOS, permisos)
-                .claim(CLAIM_SUCURSAL_ID, sucursalId)
-                .claim(CLAIM_CLAVE_CADUCADA, claveCaducada)
-                .expiresIn(duracionAccessTokenMinutos * 60)
-                .sign();
+                .claim(CLAIM_CLAVE_CADUCADA, claveCaducada);
+        if (sucursalId != null) {
+            claims.claim(CLAIM_SUCURSAL_ID, sucursalId);
+        }
+        return claims.expiresIn(duracionAccessTokenMinutos * 60).sign();
     }
 
     /** 256 bits aleatorios, Base64 URL-safe: el valor que recibe el cliente en la cookie. */

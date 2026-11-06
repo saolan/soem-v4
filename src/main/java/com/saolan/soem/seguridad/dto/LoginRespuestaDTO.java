@@ -10,10 +10,10 @@ import com.saolan.soem.compartido.dto.ComboDTO;
  * {@code accessToken} si, porque el frontend debe guardarlo en memoria segun
  * AGENTS.md.
  *
- * @param sucursalId    sucursal activa de la sesion
- * @param sucursales    sucursales accesibles del usuario: si hay mas de una,
- *                      el frontend ofrece elegir y llama a
- *                      {@code POST /auth/cambiar-sucursal}
+ * @param sucursalId    sucursal activa de la sesion; {@code null} mientras la
+ *                      seleccion este pendiente
+ * @param sucursales    sucursales accesibles del usuario (opciones del
+ *                      selector de sucursal)
  * @param claveCaducada si la clave del usuario esta caducada: el token se
  *                      emite sin permisos, de modo que solo puede usarse
  *                      para {@code /auth/cambiar-clave}, {@code /auth/me} y
@@ -21,6 +21,11 @@ import com.saolan.soem.compartido.dto.ComboDTO;
  * @param inactividadSegundos segundos sin uso tras los que el frontend
  *                      cierra la sesion; el servidor vence el refresh token
  *                      con un margen adicional
+ * @param requiereSeleccionSucursal si el usuario tiene acceso a varias
+ *                      sucursales y aun no eligio una: el token se emite sin
+ *                      sucursal ni permisos, y el frontend debe mostrar el
+ *                      selector y llamar a {@code POST /auth/cambiar-sucursal}
+ *                      antes de permitir el ingreso de datos
  */
 public record LoginRespuestaDTO(
         String accessToken,
@@ -30,5 +35,6 @@ public record LoginRespuestaDTO(
         UsuarioDTO usuario,
         List<String> permisos,
         boolean claveCaducada,
-        long inactividadSegundos) {
+        long inactividadSegundos,
+        boolean requiereSeleccionSucursal) {
 }
