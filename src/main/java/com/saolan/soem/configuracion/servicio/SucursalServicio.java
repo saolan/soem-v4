@@ -13,17 +13,21 @@ import com.saolan.soem.compartido.excepcion.ExcepcionValidacion;
 import com.saolan.soem.compartido.servicio.ReemplazoPorDiferencia;
 import com.saolan.soem.configuracion.dto.SucuBodeDTO;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
+import com.saolan.soem.configuracion.dto.SucuPrecDTO;
 import com.saolan.soem.configuracion.dto.SucursalDTO;
 import com.saolan.soem.configuracion.dto.SucursalFiltroDTO;
 import com.saolan.soem.configuracion.mapeador.SucuCertEmisMapeador;
 import com.saolan.soem.configuracion.mapeador.SucursalMapeador;
 import com.saolan.soem.configuracion.modelo.Bodega;
 import com.saolan.soem.configuracion.modelo.CertEmis;
+import com.saolan.soem.configuracion.modelo.Precio;
 import com.saolan.soem.configuracion.modelo.SucuBode;
 import com.saolan.soem.configuracion.modelo.SucuCertEmis;
+import com.saolan.soem.configuracion.modelo.SucuPrec;
 import com.saolan.soem.configuracion.modelo.Sucursal;
 import com.saolan.soem.configuracion.repositorio.BodegaRepositorio;
 import com.saolan.soem.configuracion.repositorio.CertEmisRepositorio;
+import com.saolan.soem.configuracion.repositorio.PrecioRepositorio;
 import com.saolan.soem.configuracion.repositorio.SucursalRepositorio;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -36,10 +40,10 @@ import jakarta.transaction.Transactional;
  * declaradas en la base de datos), {@code estado} gestionado solo por
  * {@link #eliminar(Integer)} y {@link #activar(Integer)} (nunca desde el
  * DTO, para que {@code modificar} no equivalga a {@code eliminar}) y las
- * composiciones con {@link SucuCertEmis} (1:1) y {@link SucuBode} (1:N),
- * expuestas como sub-recursos independientes
- * ({@code /sucursales/{id}/certificado-emision} y
- * {@code /sucursales/{id}/bodegas}) pero administradas siempre dentro de la
+ * composiciones con {@link SucuCertEmis} (1:1), {@link SucuBode} (1:N) y
+ * {@link SucuPrec} (1:N), expuestas como sub-recursos independientes
+ * ({@code /sucursales/{id}/certificado-emision}, {@code /bodegas} y
+ * {@code /precios}) pero administradas siempre dentro de la
  * transaccion de este mismo Service, sin un Service propio, para no permitir
  * mutarlas sin las validaciones de la sucursal duena.
  */
@@ -54,6 +58,9 @@ public class SucursalServicio {
 
     @Inject
     private BodegaRepositorio bodegaRepositorio;
+
+    @Inject
+    private PrecioRepositorio precioRepositorio;
 
     @Inject
     private SucursalMapeador sucursalMapeador;
@@ -226,6 +233,53 @@ public class SucursalServicio {
                     sucuBode.setAcceso(acceso);
                     return sucuBode;
                 });
+    }
+
+    /**
+     * Sub-recurso {@code /sucursales/{id}/precios}: listas de precio asignadas
+     * a la sucursal, habilitadas o no.
+     */
+    public List<SucuPrecDTO> precios(Integer sucursalId) {
+        obtenerOFallar(sucursalId);
+        return sucursalRepositorio.buscarPrecios(sucursalId);
+    }
+
+    /**
+     * Sub-recurso {@code /sucursales/{id}/precios}: reemplaza en bloque las
+     * listas de precio de la sucursal. Una lista nueva o rehabilitada con
+     * {@code acceso} debe estar activa; deshabilitar o quitar una inactiva
+     * siempre se permite. No crea ni borra filas en {@code PROD_PREC}.
+     */
+    @Transactional
+    public void reemplazarPrecios(Integer sucursalId, List<AsignacionAccesoDTO> asignaciones) {
+        Sucursal sucursal = obtenerOFallar(sucursalId);
+
+        ReemplazoPorDiferencia.aplicar(sucursal.getPrecios(), asignaciones, "precios",
+                sucuPrec -> sucuPrec.getPrecio().getPrecioId(),
+                (sucuPrec, acceso) -> {
+                    if (Boolean.TRUE.equals(acceso) && !Boolean.TRUE.equals(sucuPrec.getAcceso())) {
+                        validarPrecioActivo(sucuPrec.getPrecio());
+                    }
+                    sucuPrec.setAcceso(acceso);
+                },
+                (precioId, acceso) -> {
+                    Precio precio = precioRepositorio.buscarPorId(precioId)
+                            .orElseThrow(() -> excepcionDeCampo("precios", "La lista de precio " + precioId + " no existe"));
+                    if (Boolean.TRUE.equals(acceso)) {
+                        validarPrecioActivo(precio);
+                    }
+                    SucuPrec sucuPrec = new SucuPrec();
+                    sucuPrec.setSucursal(sucursal);
+                    sucuPrec.setPrecio(precio);
+                    sucuPrec.setAcceso(acceso);
+                    return sucuPrec;
+                });
+    }
+
+    private void validarPrecioActivo(Precio precio) {
+        if (!Boolean.TRUE.equals(precio.getEstado())) {
+            throw excepcionDeCampo("precios", "La lista de precio " + precio.getPrecioId() + " está inactiva");
+        }
     }
 
     private void validarBodegaActiva(Bodega bodega) {

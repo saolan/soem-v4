@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +31,7 @@ import com.saolan.soem.compartido.excepcion.ExcepcionNoEncontrado;
 import com.saolan.soem.compartido.excepcion.ExcepcionValidacion;
 import com.saolan.soem.configuracion.dto.SucuBodeDTO;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
+import com.saolan.soem.configuracion.dto.SucuPrecDTO;
 import com.saolan.soem.configuracion.dto.SucursalDTO;
 import com.saolan.soem.configuracion.dto.SucursalFiltroDTO;
 import com.saolan.soem.configuracion.mapeador.SucuCertEmisMapeador;
@@ -38,11 +40,14 @@ import com.saolan.soem.configuracion.mapeador.SucursalMapeador;
 import com.saolan.soem.configuracion.mapeador.SucursalMapeadorImpl;
 import com.saolan.soem.configuracion.modelo.Bodega;
 import com.saolan.soem.configuracion.modelo.CertEmis;
+import com.saolan.soem.configuracion.modelo.Precio;
 import com.saolan.soem.configuracion.modelo.SucuBode;
 import com.saolan.soem.configuracion.modelo.SucuCertEmis;
+import com.saolan.soem.configuracion.modelo.SucuPrec;
 import com.saolan.soem.configuracion.modelo.Sucursal;
 import com.saolan.soem.configuracion.repositorio.BodegaRepositorio;
 import com.saolan.soem.configuracion.repositorio.CertEmisRepositorio;
+import com.saolan.soem.configuracion.repositorio.PrecioRepositorio;
 import com.saolan.soem.configuracion.repositorio.SucursalRepositorio;
 
 /**
@@ -63,6 +68,9 @@ class SucursalServicioTest {
 
     @Mock
     private BodegaRepositorio bodegaRepositorio;
+
+    @Mock
+    private PrecioRepositorio precioRepositorio;
 
     @Spy
     private SucursalMapeador sucursalMapeador = new SucursalMapeadorImpl();
@@ -516,7 +524,91 @@ class SucursalServicioTest {
         assertEquals("bodegas", excepcion.getErrores().get(0).campo());
     }
 
+    // ---------- precios ----------
+
+    @Test
+    void precios_deberiaDelegarEnRepositorio() {
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(crearSucursalEntidad(1, "S001", "1234567890001", false, true)));
+        when(sucursalRepositorio.buscarPrecios(1)).thenReturn(List.of(new SucuPrecDTO(1, "Unidad", true)));
+
+        assertEquals(1, sucursalServicio.precios(1).size());
+    }
+
+    @Test
+    void precios_deberiaLanzarNoEncontrado_cuandoLaSucursalNoExiste() {
+        when(sucursalRepositorio.buscarPorId(99)).thenReturn(Optional.empty());
+
+        assertThrows(ExcepcionNoEncontrado.class, () -> sucursalServicio.precios(99));
+    }
+
+    @Test
+    void reemplazarPrecios_deberiaAplicarPorDiferencia() {
+        Sucursal sucursal = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
+        SucuPrec conservada = agregarPrecio(sucursal, crearPrecioEntidad(1, true), true);
+        agregarPrecio(sucursal, crearPrecioEntidad(3, true), true);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(sucursal));
+        when(precioRepositorio.buscarPorId(2)).thenReturn(Optional.of(crearPrecioEntidad(2, true)));
+
+        sucursalServicio.reemplazarPrecios(1, List.of(new AsignacionAccesoDTO(1, true), new AsignacionAccesoDTO(2, true)));
+
+        assertEquals(2, sucursal.getPrecios().size());
+        assertSame(conservada, sucursal.getPrecios().get(0));
+        assertEquals(2, sucursal.getPrecios().get(1).getPrecio().getPrecioId());
+        verify(precioRepositorio, never()).buscarPorId(1);
+    }
+
+    @Test
+    void reemplazarPrecios_deberiaLanzarValidacion_cuandoLaListaNoExiste() {
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(crearSucursalEntidad(1, "S001", "1234567890001", false, true)));
+        when(precioRepositorio.buscarPorId(99)).thenReturn(Optional.empty());
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class,
+                () -> sucursalServicio.reemplazarPrecios(1, List.of(new AsignacionAccesoDTO(99, true))));
+        assertEquals("precios", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void reemplazarPrecios_deberiaLanzarValidacion_cuandoSeHabilitaUnaListaInactiva() {
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(crearSucursalEntidad(1, "S001", "1234567890001", false, true)));
+        when(precioRepositorio.buscarPorId(2)).thenReturn(Optional.of(crearPrecioEntidad(2, false)));
+
+        ExcepcionValidacion excepcion = assertThrows(ExcepcionValidacion.class,
+                () -> sucursalServicio.reemplazarPrecios(1, List.of(new AsignacionAccesoDTO(2, true))));
+        assertEquals("precios", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void reemplazarPrecios_deberiaPermitirDeshabilitarUnaListaInactiva() {
+        Sucursal sucursal = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
+        SucuPrec asignada = agregarPrecio(sucursal, crearPrecioEntidad(2, false), true);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(sucursal));
+
+        sucursalServicio.reemplazarPrecios(1, List.of(new AsignacionAccesoDTO(2, false)));
+
+        assertFalse(asignada.getAcceso());
+    }
+
     // ---------- helpers ----------
+
+    private Precio crearPrecioEntidad(Integer precioId, boolean estado) {
+        Precio precio = new Precio();
+        precio.setPrecioId(precioId);
+        precio.setCodigo("P" + precioId);
+        precio.setDescri("Precio " + precioId);
+        precio.setAlcanc(Precio.ALCANCE_NINGUNO);
+        precio.setFactor(BigDecimal.ONE);
+        precio.setEstado(estado);
+        return precio;
+    }
+
+    private SucuPrec agregarPrecio(Sucursal sucursal, Precio precio, boolean acceso) {
+        SucuPrec sucuPrec = new SucuPrec();
+        sucuPrec.setSucursal(sucursal);
+        sucuPrec.setPrecio(precio);
+        sucuPrec.setAcceso(acceso);
+        sucursal.getPrecios().add(sucuPrec);
+        return sucuPrec;
+    }
 
     private Bodega crearBodegaEntidad(Integer bodegaId, boolean estado) {
         Bodega bodega = new Bodega();
