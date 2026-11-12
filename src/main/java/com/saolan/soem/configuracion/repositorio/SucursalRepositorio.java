@@ -37,7 +37,7 @@ import jakarta.persistence.criteria.Root;
 public class SucursalRepositorio {
 
     private static final Set<String> CAMPOS_ORDEN_PERMITIDOS =
-            Set.of("sucursalId", "codigo", "descri", "ruc", "ciudad", "matriz", "estado");
+            Set.of("sucursalId", "codigo", "descri", "ruc", "matriz", "estado");
     private static final String CAMPO_ORDEN_PREDETERMINADO = "descri";
 
     @PersistenceContext
@@ -180,10 +180,6 @@ public class SucursalRepositorio {
         }
         if (filtro.ruc() != null && !filtro.ruc().isBlank()) {
             predicados.add(criteriaBuilder.like(raiz.get("ruc"), "%" + filtro.ruc() + "%"));
-        }
-        if (filtro.ciudad() != null && !filtro.ciudad().isBlank()) {
-            predicados.add(criteriaBuilder.like(criteriaBuilder.lower(raiz.get("ciudad")),
-                    "%" + filtro.ciudad().toLowerCase(Locale.ROOT) + "%"));
         }
         if (filtro.matriz() != null) {
             predicados.add(criteriaBuilder.equal(raiz.get("matriz"), filtro.matriz()));

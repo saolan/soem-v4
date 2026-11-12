@@ -299,7 +299,7 @@ class SucursalServicioTest {
 
     @Test
     void buscar_deberiaDelegarEnRepositorioYMapear() {
-        SucursalFiltroDTO filtro = new SucursalFiltroDTO(null, null, null, null, null, null);
+        SucursalFiltroDTO filtro = new SucursalFiltroDTO(null, null, null, null, null);
         ParametrosBusqueda parametrosBusqueda = new ParametrosBusqueda(1, 20, "descri", "asc");
         when(sucursalRepositorio.buscarPaginado(filtro, parametrosBusqueda))
                 .thenReturn(List.of(crearSucursalEntidad(1, "S001", "1234567890001", false, true)));
@@ -312,7 +312,7 @@ class SucursalServicioTest {
 
     @Test
     void contar_deberiaDelegarEnRepositorio() {
-        SucursalFiltroDTO filtro = new SucursalFiltroDTO(null, null, null, null, null, null);
+        SucursalFiltroDTO filtro = new SucursalFiltroDTO(null, null, null, null, null);
         when(sucursalRepositorio.contar(filtro)).thenReturn(5L);
 
         assertEquals(5L, sucursalServicio.contar(filtro));

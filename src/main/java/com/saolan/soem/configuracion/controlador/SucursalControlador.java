@@ -60,12 +60,11 @@ public class SucursalControlador {
             @QueryParam("codigo") String codigo,
             @QueryParam("descri") String descri,
             @QueryParam("ruc") String ruc,
-            @QueryParam("ciudad") String ciudad,
             @QueryParam("matriz") Boolean matriz,
             @QueryParam("estado") Boolean estado) {
 
         ParametrosBusqueda parametrosBusqueda = new ParametrosBusqueda(pagina, tamanio, ordenarPor, direccion);
-        SucursalFiltroDTO filtro = new SucursalFiltroDTO(codigo, descri, ruc, ciudad, matriz, estado);
+        SucursalFiltroDTO filtro = new SucursalFiltroDTO(codigo, descri, ruc, matriz, estado);
 
         List<SucursalDTO> resultado = sucursalServicio.buscar(filtro, parametrosBusqueda);
         long totalRegistros = sucursalServicio.contar(filtro);

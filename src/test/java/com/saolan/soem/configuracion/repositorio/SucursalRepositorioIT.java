@@ -37,9 +37,8 @@ import jakarta.transaction.UserTransaction;
  * <p>
  * <b>Precondición</b>: se asume una base de datos de pruebas dedicada, recién
  * migrada con Flyway. La tabla {@code sucursal} puede no estar vacía (p. ej.
- * la sucursal de {@code db/seed-usuario-prueba.sql}, con {@code matriz=false}
- * y ciudad "Ambato" a propósito, para no interferir con los filtros por
- * ciudad de este archivo):
+ * la sucursal de {@code db/seed-usuario-prueba.sql}, con {@code matriz=false},
+ * o la sucursal {@code 001} de {@code db/insert-inicial.sql}):
  * las aserciones sobre listados comparan por pertenencia
  * ({@code anyMatch}/{@code noneMatch}), no por tamaño total. No correr contra
  * un ambiente con datos de negocio reales de todos modos.
@@ -117,24 +116,12 @@ class SucursalRepositorioIT {
     }
 
     @Test
-    void buscarPaginado_deberiaFiltrarPorCiudad() {
-        crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false, "Quito"));
-        crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false, "Guayaquil"));
-
-        SucursalFiltroDTO filtro = new SucursalFiltroDTO(null, null, null, "Quito", null, null);
-        List<Sucursal> resultado = sucursalRepositorio.buscarPaginado(filtro, new ParametrosBusqueda(1, 20, "descri", "asc"));
-
-        assertEquals(1, resultado.size());
-        assertEquals("Quito", resultado.get(0).getCiudad());
-    }
-
-    @Test
     void buscarPaginado_deberiaDevolverVariasMatrices_cuandoFiltraPorMatriz() {
         Sucursal primera = crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), true));
         Sucursal segunda = crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), true));
 
         List<Sucursal> resultado = sucursalRepositorio.buscarPaginado(
-                new SucursalFiltroDTO(null, null, null, null, true, null),
+                new SucursalFiltroDTO(null, null, null, true, null),
                 new ParametrosBusqueda(1, 200, "descri", "asc"));
 
         assertTrue(resultado.stream().anyMatch(s -> s.getSucursalId().equals(primera.getSucursalId())));
@@ -150,7 +137,7 @@ class SucursalRepositorioIT {
         Sucursal creada = crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false));
 
         List<Sucursal> resultado = sucursalRepositorio.buscarPaginado(
-                new SucursalFiltroDTO(null, null, null, null, null, null),
+                new SucursalFiltroDTO(null, null, null, null, null),
                 new ParametrosBusqueda(1, 200, "campoInexistente; DROP TABLE sucursal", "asc"));
 
         assertTrue(resultado.stream().anyMatch(s -> s.getSucursalId().equals(creada.getSucursalId())));
@@ -158,11 +145,13 @@ class SucursalRepositorioIT {
 
     @Test
     void contar_deberiaContarSoloLoQueCoincideConElFiltro() {
-        crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false, "Cuenca"));
-        crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false, "Cuenca"));
-        crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false, "Loja"));
+        // Prefijo de código único por ejecución: ningún otro registro de la tabla puede coincidir.
+        String prefijo = codigoAleatorio();
+        crear(nuevaSucursal(prefijo + "A", rucAleatorio(), false));
+        crear(nuevaSucursal(prefijo + "B", rucAleatorio(), false));
+        crear(nuevaSucursal(codigoAleatorio(), rucAleatorio(), false));
 
-        long total = sucursalRepositorio.contar(new SucursalFiltroDTO(null, null, null, "Cuenca", null, null));
+        long total = sucursalRepositorio.contar(new SucursalFiltroDTO(prefijo, null, null, null, null));
 
         assertEquals(2L, total);
     }
@@ -191,10 +180,6 @@ class SucursalRepositorioIT {
     }
 
     private Sucursal nuevaSucursal(String codigo, String ruc, boolean matriz) {
-        return nuevaSucursal(codigo, ruc, matriz, "Quito");
-    }
-
-    private Sucursal nuevaSucursal(String codigo, String ruc, boolean matriz, String ciudad) {
         Sucursal sucursal = new Sucursal();
         sucursal.setCodigo(codigo);
         sucursal.setRuc(ruc);
@@ -202,7 +187,7 @@ class SucursalRepositorioIT {
         sucursal.setEstado(Boolean.TRUE);
         sucursal.setDescri("Sucursal de prueba");
         sucursal.setRazonSoci("Razón Social de Prueba");
-        sucursal.setCiudad(ciudad);
+        sucursal.setCiudad("Quito");
         sucursal.setDirecc("Av. de Prueba 123");
         sucursal.setDireccEsta("Av. de Prueba 123");
         sucursal.setTelef1("0999999999");

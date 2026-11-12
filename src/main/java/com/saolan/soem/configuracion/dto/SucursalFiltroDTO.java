@@ -8,7 +8,6 @@ public record SucursalFiltroDTO(
         String codigo,
         String descri,
         String ruc,
-        String ciudad,
         Boolean matriz,
         Boolean estado) {
 }
