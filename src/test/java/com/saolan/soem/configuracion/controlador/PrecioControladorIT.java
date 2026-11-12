@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
-import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.configuracion.dto.PrecioDTO;
 import com.saolan.soem.configuracion.dto.SucuPrecDTO;
@@ -70,6 +70,7 @@ class PrecioControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(PrecioControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -136,35 +137,43 @@ class PrecioControladorIT {
 
     @Test
     void buscar_conToken_deberiaRetornarListadoPaginado() {
-        assertEquals(200, get("api/v1/precios?pagina=1&tamanio=5&ordenarPor=codigo").getStatus());
+        // queryParam y no "?…" dentro de path(): path() codifica el "?" como %3F y la ruta no existe.
+        Response respuesta = target("api/v1/precios")
+                .queryParam("pagina", 1)
+                .queryParam("tamanio", 5)
+                .queryParam("ordenarPor", "codigo")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .get();
+        assertEquals(200, respuesta.getStatus());
     }
 
     @Test
     void crear_modificar_yEliminar_deberiaCompletarElCiclo() {
-        Integer id = registrarParaLimpieza(crear(nuevoDTO(Precio.ALCANCE_NINGUNO)));
+        Integer id = registrarParaLimpieza(crear(nuevoDTO("NINGUNO")));
 
-        PrecioDTO cambios = nuevoDTO(Precio.ALCANCE_TODOS);
+        PrecioDTO cambios = nuevoDTO("TODOS");
         Response respuestaModificar = target("api/v1/precios/" + id)
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .put(Entity.entity(cambios, MediaType.APPLICATION_JSON));
         assertEquals(200, respuestaModificar.getStatus());
-        PrecioDTO modificado = respuestaModificar.readEntity(new GenericType<RespuestaApi<PrecioDTO>>() { }).datos();
+        PrecioDTO modificado = RespuestaPrueba.leer(respuestaModificar, new GenericType<PrecioDTO>() { }).datos();
         assertEquals(cambios.descri(), modificado.descri());
-        assertEquals(Precio.ALCANCE_NINGUNO, modificado.alcanc());
+        assertEquals("NINGUNO", modificado.alcanc());
 
         assertEquals(200, eliminar(id).getStatus());
         Response respuestaBuscar = get("api/v1/precios/" + id);
-        assertFalse(respuestaBuscar.readEntity(new GenericType<RespuestaApi<PrecioDTO>>() { }).datos().estado());
+        assertFalse(RespuestaPrueba.leer(respuestaBuscar, new GenericType<PrecioDTO>() { }).datos().estado());
     }
 
     @Test
     void crear_conCodigoDuplicado_deberiaRetornar409() {
-        PrecioDTO primero = nuevoDTO(Precio.ALCANCE_NINGUNO);
+        PrecioDTO primero = nuevoDTO("NINGUNO");
         registrarParaLimpieza(crear(primero));
 
         PrecioDTO segundo = new PrecioDTO(null, primero.codigo().toLowerCase(Locale.ROOT), descriAleatoria(),
-                Precio.ALCANCE_NINGUNO, BigDecimal.ONE, true);
+                "NINGUNO", BigDecimal.ONE, true);
 
         assertEquals(409, crear(segundo).getStatus());
     }
@@ -172,8 +181,8 @@ class PrecioControladorIT {
     @Test
     void crear_conFactorCeroOAlcanceInvalido_deberiaRetornar400() {
         String codigo = codigoAleatorio();
-        assertEquals(400, crear(new PrecioDTO(null, codigo, descriAleatoria(), 0, BigDecimal.ZERO, true)).getStatus());
-        assertEquals(400, crear(new PrecioDTO(null, codigo, descriAleatoria(), 2, BigDecimal.ONE, true)).getStatus());
+        assertEquals(400, crear(new PrecioDTO(null, codigo, descriAleatoria(), "NINGUNO", BigDecimal.ZERO, true)).getStatus());
+        assertEquals(400, crear(new PrecioDTO(null, codigo, descriAleatoria(), "Todos", BigDecimal.ONE, true)).getStatus());
     }
 
     @Test
@@ -181,7 +190,7 @@ class PrecioControladorIT {
         Integer sucursalId = crearSucursal();
         assumeTrue(sucursalId != null, "Requiere permisos para crear sucursales");
 
-        Integer precioId = registrarParaLimpieza(crear(nuevoDTO(Precio.ALCANCE_TODOS)));
+        Integer precioId = registrarParaLimpieza(crear(nuevoDTO("TODOS")));
 
         List<SucuPrecDTO> precios = preciosDeSucursal(sucursalId);
         assertEquals(1, precios.stream().filter(p -> p.precioId().equals(precioId) && p.acceso()).count());
@@ -191,7 +200,7 @@ class PrecioControladorIT {
 
     @Test
     void preciosDeSucursal_deberianReemplazarseLeerseYBloquearLaBaja() {
-        Integer precioId = registrarParaLimpieza(crear(nuevoDTO(Precio.ALCANCE_NINGUNO)));
+        Integer precioId = registrarParaLimpieza(crear(nuevoDTO("NINGUNO")));
         Integer sucursalId = crearSucursal();
         assumeTrue(sucursalId != null, "Requiere permisos para crear sucursales");
         List<AsignacionAccesoDTO> asignaciones = List.of(new AsignacionAccesoDTO(precioId, true));
@@ -241,8 +250,8 @@ class PrecioControladorIT {
     }
 
     private List<SucuPrecDTO> preciosDeSucursal(Integer sucursalId) {
-        return get("api/v1/sucursales/" + sucursalId + "/precios")
-                .readEntity(new GenericType<RespuestaApi<List<SucuPrecDTO>>>() { }).datos();
+        return RespuestaPrueba.leer(get("api/v1/sucursales/" + sucursalId + "/precios"),
+                new GenericType<List<SucuPrecDTO>>() { }).datos();
     }
 
     private Response reemplazarPrecios(Integer sucursalId, List<AsignacionAccesoDTO> asignaciones) {
@@ -254,7 +263,7 @@ class PrecioControladorIT {
 
     private Integer registrarParaLimpieza(Response respuestaCrear) {
         assertEquals(201, respuestaCrear.getStatus());
-        Integer id = respuestaCrear.readEntity(new GenericType<RespuestaApi<PrecioDTO>>() { }).datos().precioId();
+        Integer id = RespuestaPrueba.leer(respuestaCrear, new GenericType<PrecioDTO>() { }).datos().precioId();
         idsCreados.add(id);
         return id;
     }
@@ -275,12 +284,12 @@ class PrecioControladorIT {
         if (respuesta.getStatus() != 201) {
             return null;
         }
-        Integer sucursalId = respuesta.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { }).datos().sucursalId();
+        Integer sucursalId = RespuestaPrueba.leer(respuesta, new GenericType<SucursalDTO>() { }).datos().sucursalId();
         idsSucursalesCreadas.add(sucursalId);
         return sucursalId;
     }
 
-    private PrecioDTO nuevoDTO(int alcanc) {
+    private PrecioDTO nuevoDTO(String alcanc) {
         return new PrecioDTO(null, codigoAleatorio(), descriAleatoria(), alcanc, new BigDecimal("12"), true);
     }
 

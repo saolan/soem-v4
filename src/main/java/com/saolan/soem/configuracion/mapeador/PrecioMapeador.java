@@ -13,7 +13,9 @@ import com.saolan.soem.configuracion.modelo.Precio;
  * Mapeo entidad/DTO de {@link Precio}. El identificador nunca se toma del
  * cuerpo de la peticion: lo asigna la base (alta) o la ruta (modificacion).
  * {@code alcanc} solo se toma en el alta: es inmutable una vez creada la
- * lista, porque ya decidio si se generaron sus precios.
+ * lista, porque ya decidio si se generaron sus precios. MapStruct convierte
+ * {@code alcanc} entre el texto del DTO y {@code AlcancePrecio} por el
+ * nombre de la constante; el DTO ya llega validado contra esos nombres.
  */
 @Mapper(componentModel = "cdi")
 public interface PrecioMapeador {

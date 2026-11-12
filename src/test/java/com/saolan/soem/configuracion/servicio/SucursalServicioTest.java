@@ -38,6 +38,7 @@ import com.saolan.soem.configuracion.mapeador.SucuCertEmisMapeador;
 import com.saolan.soem.configuracion.mapeador.SucuCertEmisMapeadorImpl;
 import com.saolan.soem.configuracion.mapeador.SucursalMapeador;
 import com.saolan.soem.configuracion.mapeador.SucursalMapeadorImpl;
+import com.saolan.soem.configuracion.modelo.AlcancePrecio;
 import com.saolan.soem.configuracion.modelo.Bodega;
 import com.saolan.soem.configuracion.modelo.CertEmis;
 import com.saolan.soem.configuracion.modelo.Precio;
@@ -595,7 +596,7 @@ class SucursalServicioTest {
         precio.setPrecioId(precioId);
         precio.setCodigo("P" + precioId);
         precio.setDescri("Precio " + precioId);
-        precio.setAlcanc(Precio.ALCANCE_NINGUNO);
+        precio.setAlcanc(AlcancePrecio.NINGUNO);
         precio.setFactor(BigDecimal.ONE);
         precio.setEstado(estado);
         return precio;

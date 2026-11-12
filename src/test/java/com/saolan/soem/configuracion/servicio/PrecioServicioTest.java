@@ -30,6 +30,7 @@ import com.saolan.soem.configuracion.dto.PrecioDTO;
 import com.saolan.soem.configuracion.dto.PrecioFiltroDTO;
 import com.saolan.soem.configuracion.mapeador.PrecioMapeador;
 import com.saolan.soem.configuracion.mapeador.PrecioMapeadorImpl;
+import com.saolan.soem.configuracion.modelo.AlcancePrecio;
 import com.saolan.soem.configuracion.modelo.Precio;
 import com.saolan.soem.configuracion.repositorio.PrecioRepositorio;
 
@@ -83,7 +84,7 @@ class PrecioServicioTest {
 
     @Test
     void crear_conAlcanceNinguno_noDeberiaGenerarPrecios() {
-        PrecioDTO creado = precioServicio.crear(nuevoDTO(" DOC ", " Docena ", Precio.ALCANCE_NINGUNO, true));
+        PrecioDTO creado = precioServicio.crear(nuevoDTO(" DOC ", " Docena ", "NINGUNO", true));
 
         assertEquals("DOC", creado.codigo());
         assertEquals("Docena", creado.descri());
@@ -101,7 +102,7 @@ class PrecioServicioTest {
         when(precioRepositorio.habilitarEnSucursalesActivas(7)).thenReturn(2);
         when(precioRepositorio.crearPreciosEnCeroDeProductosActivos(7)).thenReturn(50);
 
-        PrecioDTO creado = precioServicio.crear(nuevoDTO("MAY", "Mayorista", Precio.ALCANCE_TODOS, true));
+        PrecioDTO creado = precioServicio.crear(nuevoDTO("MAY", "Mayorista", "TODOS", true));
 
         assertEquals(7, creado.precioId());
         verify(precioRepositorio).habilitarEnSucursalesActivas(7);
@@ -114,7 +115,7 @@ class PrecioServicioTest {
         when(precioRepositorio.buscarPorDescri("Unidad", null)).thenReturn(Optional.of(nuevoPrecio(1, "Und", "Unidad", true)));
 
         ExcepcionConflicto excepcion = assertThrows(ExcepcionConflicto.class,
-                () -> precioServicio.crear(nuevoDTO("Und", "Unidad", Precio.ALCANCE_TODOS, true)));
+                () -> precioServicio.crear(nuevoDTO("Und", "Unidad", "TODOS", true)));
 
         assertEquals(List.of("codigo", "descri"), excepcion.getErrores().stream().map(e -> e.campo()).toList());
         verify(precioRepositorio, never()).crear(any(Precio.class));
@@ -129,11 +130,11 @@ class PrecioServicioTest {
         when(precioRepositorio.buscarPorId(1)).thenReturn(Optional.of(precio));
 
         PrecioDTO modificado = precioServicio.modificar(1,
-                new PrecioDTO(1, "UN", "Unidad suelta", Precio.ALCANCE_TODOS, new BigDecimal("2"), true));
+                new PrecioDTO(1, "UN", "Unidad suelta", "TODOS", new BigDecimal("2"), true));
 
         assertEquals("Unidad suelta", modificado.descri());
         assertEquals(0, new BigDecimal("2").compareTo(modificado.factor()));
-        assertEquals(Precio.ALCANCE_NINGUNO, precio.getAlcanc());
+        assertEquals(AlcancePrecio.NINGUNO, precio.getAlcanc());
         verify(precioRepositorio, never()).contarSucursalesAsignadas(1);
         verify(precioRepositorio, never()).crearPreciosEnCeroDeProductosActivos(any());
     }
@@ -145,7 +146,7 @@ class PrecioServicioTest {
         when(precioRepositorio.contarSucursalesAsignadas(1)).thenReturn(2L);
 
         ExcepcionConflicto excepcion = assertThrows(ExcepcionConflicto.class,
-                () -> precioServicio.modificar(1, nuevoDTO("Und", "Unidad", Precio.ALCANCE_NINGUNO, false)));
+                () -> precioServicio.modificar(1, nuevoDTO("Und", "Unidad", "NINGUNO", false)));
 
         assertEquals("estado", excepcion.getErrores().get(0).campo());
         assertTrue(precio.getEstado());
@@ -178,7 +179,7 @@ class PrecioServicioTest {
 
     // ---------- helpers ----------
 
-    private PrecioDTO nuevoDTO(String codigo, String descri, int alcanc, boolean estado) {
+    private PrecioDTO nuevoDTO(String codigo, String descri, String alcanc, boolean estado) {
         return new PrecioDTO(null, codigo, descri, alcanc, BigDecimal.ONE, estado);
     }
 
@@ -187,7 +188,7 @@ class PrecioServicioTest {
         precio.setPrecioId(precioId);
         precio.setCodigo(codigo);
         precio.setDescri(descri);
-        precio.setAlcanc(Precio.ALCANCE_NINGUNO);
+        precio.setAlcanc(AlcancePrecio.NINGUNO);
         precio.setFactor(BigDecimal.ONE);
         precio.setEstado(estado);
         return precio;

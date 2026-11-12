@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.configuracion.dto.PrecioFiltroDTO;
+import com.saolan.soem.configuracion.modelo.AlcancePrecio;
 import com.saolan.soem.configuracion.modelo.Precio;
 
 import jakarta.annotation.Resource;
@@ -78,6 +79,17 @@ class PrecioRepositorioIT {
             }
             return null;
         });
+    }
+
+    @Test
+    void alcanc_deberiaPersistirseComoTexto() {
+        Precio precio = crear(nuevoPrecio(true));
+
+        Object alcanc = entityManager.createNativeQuery("SELECT alcanc FROM precio WHERE precio_id = ?1")
+                .setParameter(1, precio.getPrecioId())
+                .getSingleResult();
+
+        assertEquals(AlcancePrecio.NINGUNO.name(), alcanc);
     }
 
     @Test
@@ -148,7 +160,7 @@ class PrecioRepositorioIT {
         Precio precio = new Precio();
         precio.setCodigo("PR-" + sufijo);
         precio.setDescri("Precio de prueba " + sufijo);
-        precio.setAlcanc(Precio.ALCANCE_NINGUNO);
+        precio.setAlcanc(AlcancePrecio.NINGUNO);
         precio.setFactor(BigDecimal.ONE);
         precio.setEstado(estado);
         return precio;

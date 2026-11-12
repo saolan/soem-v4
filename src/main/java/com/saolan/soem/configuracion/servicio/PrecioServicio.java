@@ -13,6 +13,7 @@ import com.saolan.soem.compartido.excepcion.ExcepcionNoEncontrado;
 import com.saolan.soem.configuracion.dto.PrecioDTO;
 import com.saolan.soem.configuracion.dto.PrecioFiltroDTO;
 import com.saolan.soem.configuracion.mapeador.PrecioMapeador;
+import com.saolan.soem.configuracion.modelo.AlcancePrecio;
 import com.saolan.soem.configuracion.modelo.Precio;
 import com.saolan.soem.configuracion.repositorio.PrecioRepositorio;
 
@@ -25,10 +26,10 @@ import jakarta.transaction.Transactional;
  * <ul>
  * <li>{@code codigo} y {@code descri} unicos (sin distinguir mayusculas y
  * sin espacios en los extremos); el DDL no declara esas restricciones.</li>
- * <li>Alcance "todos" ({@link Precio#ALCANCE_TODOS}): en la misma
+ * <li>Alcance {@link AlcancePrecio#TODOS}: en la misma
  * transaccion del alta, la lista se habilita en todas las sucursales activas
  * y se crea el precio en cero de cada producto activo en cada una. Con
- * alcance "ninguno" no se genera nada. El alcance es inmutable.</li>
+ * {@link AlcancePrecio#NINGUNO} no se genera nada. El alcance es inmutable.</li>
  * <li>Una lista habilitada en alguna sucursal ({@code SUCU_PREC} con
  * {@code acceso}) no puede desactivarse, ni por DELETE ni por un PUT con
  * {@code estado=false}: primero debe quitarse de esas sucursales.</li>
@@ -70,7 +71,7 @@ public class PrecioServicio {
 
         Precio precio = precioMapeador.aPrecio(normalizado);
         precioRepositorio.crear(precio);
-        if (precio.getAlcanc() == Precio.ALCANCE_TODOS) {
+        if (precio.getAlcanc() == AlcancePrecio.TODOS) {
             generarAlcanceTodos(precio.getPrecioId());
         }
         return precioMapeador.aPrecioDTO(precio);
