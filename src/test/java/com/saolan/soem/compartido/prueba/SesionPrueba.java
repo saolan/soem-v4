@@ -2,7 +2,6 @@ package com.saolan.soem.compartido.prueba;
 
 import java.util.function.Function;
 
-import com.saolan.soem.compartido.dto.RespuestaApi;
 import com.saolan.soem.seguridad.dto.CambioSucursalDTO;
 import com.saolan.soem.seguridad.dto.LoginRespuestaDTO;
 
@@ -56,6 +55,6 @@ public final class SesionPrueba {
     }
 
     public static LoginRespuestaDTO leerSesion(Response respuesta) {
-        return respuesta.readEntity(new GenericType<RespuestaApi<LoginRespuestaDTO>>() { }).datos();
+        return RespuestaPrueba.leer(respuesta, new GenericType<LoginRespuestaDTO>() { }).datos();
     }
 }

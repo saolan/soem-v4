@@ -28,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
 import com.saolan.soem.configuracion.dto.SucursalDTO;
@@ -76,6 +77,7 @@ class SucursalControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(SucursalControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -142,7 +144,7 @@ class SucursalControladorIT {
                 .get();
 
         assertEquals(200, respuesta.getStatus());
-        RespuestaApi<List<SucursalDTO>> cuerpo = respuesta.readEntity(new GenericType<RespuestaApi<List<SucursalDTO>>>() { });
+        RespuestaApi<List<SucursalDTO>> cuerpo = RespuestaPrueba.leer(respuesta, new GenericType<List<SucursalDTO>>() { });
         assertTrue(cuerpo.exito());
         assertNotNull(cuerpo.paginacion());
     }
@@ -185,7 +187,7 @@ class SucursalControladorIT {
                 .put(Entity.entity(sucursalDTO(id, codigoNuevo, rucAleatorio(), false), MediaType.APPLICATION_JSON));
 
         assertEquals(200, respuestaModificar.getStatus());
-        RespuestaApi<SucursalDTO> cuerpo = respuestaModificar.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { });
+        RespuestaApi<SucursalDTO> cuerpo = RespuestaPrueba.leer(respuestaModificar, new GenericType<SucursalDTO>() { });
         assertEquals(codigoNuevo, cuerpo.datos().codigo());
     }
 
@@ -205,7 +207,7 @@ class SucursalControladorIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .get();
         assertEquals(200, respuestaBuscar.getStatus());
-        RespuestaApi<SucursalDTO> cuerpo = respuestaBuscar.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { });
+        RespuestaApi<SucursalDTO> cuerpo = RespuestaPrueba.leer(respuestaBuscar, new GenericType<SucursalDTO>() { });
         assertFalse(cuerpo.datos().estado());
     }
 
@@ -221,7 +223,7 @@ class SucursalControladorIT {
                 .put(Entity.entity(inactiva, MediaType.APPLICATION_JSON));
 
         assertEquals(200, respuestaModificar.getStatus());
-        RespuestaApi<SucursalDTO> cuerpo = respuestaModificar.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { });
+        RespuestaApi<SucursalDTO> cuerpo = RespuestaPrueba.leer(respuestaModificar, new GenericType<SucursalDTO>() { });
         assertTrue(cuerpo.datos().estado());
     }
 
@@ -241,7 +243,7 @@ class SucursalControladorIT {
                 .put(Entity.json(""));
 
         assertEquals(200, respuestaActivar.getStatus());
-        RespuestaApi<SucursalDTO> cuerpo = respuestaActivar.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { });
+        RespuestaApi<SucursalDTO> cuerpo = RespuestaPrueba.leer(respuestaActivar, new GenericType<SucursalDTO>() { });
         assertTrue(cuerpo.datos().estado());
     }
 
@@ -259,7 +261,7 @@ class SucursalControladorIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .get();
         assertEquals(200, respuestaCombo.getStatus());
-        RespuestaApi<List<ComboDTO>> comboBody = respuestaCombo.readEntity(new GenericType<RespuestaApi<List<ComboDTO>>>() { });
+        RespuestaApi<List<ComboDTO>> comboBody = RespuestaPrueba.leer(respuestaCombo, new GenericType<List<ComboDTO>>() { });
         assumeTrue(!comboBody.datos().isEmpty(), "Requiere al menos un CertEmis activo cargado en la base de pruebas");
         Integer certEmisId = comboBody.datos().get(0).valor();
 
@@ -304,7 +306,7 @@ class SucursalControladorIT {
     }
 
     private Integer registrarParaLimpieza(Response respuestaCrear) {
-        RespuestaApi<SucursalDTO> cuerpo = respuestaCrear.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { });
+        RespuestaApi<SucursalDTO> cuerpo = RespuestaPrueba.leer(respuestaCrear, new GenericType<SucursalDTO>() { });
         Integer id = cuerpo.datos().sucursalId();
         idsCreados.add(id);
         return id;

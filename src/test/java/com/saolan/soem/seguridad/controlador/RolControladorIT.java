@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.compartido.seguridad.Accion;
 import com.saolan.soem.configuracion.modelo.Sucursal;
@@ -73,6 +74,7 @@ class RolControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(RolControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -158,7 +160,7 @@ class RolControladorIT {
                 .put(Entity.entity(new RolDTO(id, descriNueva, true), MediaType.APPLICATION_JSON));
 
         assertEquals(200, respuestaModificar.getStatus());
-        RespuestaApi<RolDTO> cuerpo = respuestaModificar.readEntity(new GenericType<RespuestaApi<RolDTO>>() { });
+        RespuestaApi<RolDTO> cuerpo = RespuestaPrueba.leer(respuestaModificar, new GenericType<RolDTO>() { });
         assertEquals(descriNueva, cuerpo.datos().descri());
     }
 
@@ -176,7 +178,7 @@ class RolControladorIT {
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .get();
-        RespuestaApi<RolDTO> cuerpo = respuestaBuscar.readEntity(new GenericType<RespuestaApi<RolDTO>>() { });
+        RespuestaApi<RolDTO> cuerpo = RespuestaPrueba.leer(respuestaBuscar, new GenericType<RolDTO>() { });
         assertFalse(cuerpo.datos().estado());
     }
 
@@ -190,7 +192,7 @@ class RolControladorIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .post(Entity.entity(new PermisoDTO(null, "Permiso de prueba", recurso, Accion.BUSCAR, null), MediaType.APPLICATION_JSON));
         assertEquals(201, respuestaCrearPermiso.getStatus());
-        Integer idPermiso = respuestaCrearPermiso.readEntity(new GenericType<RespuestaApi<PermisoDTO>>() { }).datos().permisoId();
+        Integer idPermiso = RespuestaPrueba.leer(respuestaCrearPermiso, new GenericType<PermisoDTO>() { }).datos().permisoId();
         idsPermisoCreados.add(idPermiso);
 
         Response respuestaAsignar = target("api/v1/roles/" + idRol + "/permisos")
@@ -239,7 +241,7 @@ class RolControladorIT {
     }
 
     private Integer registrarRolParaLimpieza(Response respuestaCrear) {
-        Integer id = respuestaCrear.readEntity(new GenericType<RespuestaApi<RolDTO>>() { }).datos().rolId();
+        Integer id = RespuestaPrueba.leer(respuestaCrear, new GenericType<RolDTO>() { }).datos().rolId();
         idsRolCreados.add(id);
         return id;
     }
