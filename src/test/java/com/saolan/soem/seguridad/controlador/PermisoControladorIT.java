@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.compartido.seguridad.Accion;
 import com.saolan.soem.seguridad.dto.LoginRequestDTO;
@@ -62,6 +63,7 @@ class PermisoControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(PermisoControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -158,7 +160,7 @@ class PermisoControladorIT {
                 .put(Entity.entity(new PermisoDTO(id, "Permiso modificado", recursoNuevo, Accion.MODIFICAR, null), MediaType.APPLICATION_JSON));
 
         assertEquals(200, respuestaModificar.getStatus());
-        RespuestaApi<PermisoDTO> cuerpo = respuestaModificar.readEntity(new GenericType<RespuestaApi<PermisoDTO>>() { });
+        RespuestaApi<PermisoDTO> cuerpo = RespuestaPrueba.leer(respuestaModificar, new GenericType<PermisoDTO>() { });
         assertEquals(recursoNuevo, cuerpo.datos().recurso());
         assertEquals(Accion.MODIFICAR, cuerpo.datos().accion());
     }
@@ -184,7 +186,7 @@ class PermisoControladorIT {
     }
 
     private Integer registrarParaLimpieza(Response respuestaCrear) {
-        Integer id = respuestaCrear.readEntity(new GenericType<RespuestaApi<PermisoDTO>>() { }).datos().permisoId();
+        Integer id = RespuestaPrueba.leer(respuestaCrear, new GenericType<PermisoDTO>() { }).datos().permisoId();
         idsCreados.add(id);
         return id;
     }

@@ -180,6 +180,7 @@ class CertEmisRepositorioIT {
         certEmis.setCertO("O Test");
         certEmis.setCertC("EC");
         certEmis.setCertOid("1.2.3.4");
+        certEmis.setCertOrganiIden("2.5.4.97");
         certEmis.setEstado(estado);
         return certEmis;
     }

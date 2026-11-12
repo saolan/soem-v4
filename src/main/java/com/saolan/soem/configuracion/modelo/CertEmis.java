@@ -45,6 +45,10 @@ public class CertEmis implements Serializable {
     @Column(name = "cert_oid", nullable = false, length = 100)
     private String certOid;
 
+    /** OID del atributo X.520 organizationIdentifier (p. ej. 2.5.4.97), donde el certificado lleva el RUC. */
+    @Column(name = "cert_organi_iden", nullable = false, length = 24)
+    private String certOrganiIden;
+
     @Column(name = "estado", nullable = false)
     private Boolean estado;
 
@@ -102,6 +106,14 @@ public class CertEmis implements Serializable {
 
     public void setCertOid(String certOid) {
         this.certOid = certOid;
+    }
+
+    public String getCertOrganiIden() {
+        return certOrganiIden;
+    }
+
+    public void setCertOrganiIden(String certOrganiIden) {
+        this.certOrganiIden = certOrganiIden;
     }
 
     public Boolean getEstado() {

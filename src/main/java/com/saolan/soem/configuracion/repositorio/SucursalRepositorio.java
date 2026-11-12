@@ -9,9 +9,12 @@ import java.util.Set;
 import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.configuracion.dto.SucuBodeDTO;
+import com.saolan.soem.configuracion.dto.SucuPrecDTO;
 import com.saolan.soem.configuracion.dto.SucursalFiltroDTO;
 import com.saolan.soem.configuracion.modelo.Bodega;
+import com.saolan.soem.configuracion.modelo.Precio;
 import com.saolan.soem.configuracion.modelo.SucuBode;
+import com.saolan.soem.configuracion.modelo.SucuPrec;
 import com.saolan.soem.configuracion.modelo.Sucursal;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -34,7 +37,7 @@ import jakarta.persistence.criteria.Root;
 public class SucursalRepositorio {
 
     private static final Set<String> CAMPOS_ORDEN_PERMITIDOS =
-            Set.of("sucursalId", "codigo", "descri", "ruc", "ciudad", "matriz", "estado");
+            Set.of("sucursalId", "codigo", "descri", "ruc", "matriz", "estado");
     private static final String CAMPO_ORDEN_PREDETERMINADO = "descri";
 
     @PersistenceContext
@@ -136,6 +139,24 @@ public class SucursalRepositorio {
         return entityManager.createQuery(query).getResultList();
     }
 
+    /**
+     * Listas de precio asignadas a la sucursal ({@code SUCU_PREC}) proyectadas
+     * a {@link SucuPrecDTO} en una sola consulta, ordenadas por descripcion.
+     */
+    public List<SucuPrecDTO> buscarPrecios(Integer sucursalId) {
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<SucuPrecDTO> query = criteriaBuilder.createQuery(SucuPrecDTO.class);
+        Root<SucuPrec> raiz = query.from(SucuPrec.class);
+        Join<SucuPrec, Precio> precio = raiz.join("precio");
+
+        query.select(criteriaBuilder.construct(SucuPrecDTO.class,
+                precio.get("precioId"), precio.get("descri"), raiz.get("acceso")));
+        query.where(criteriaBuilder.equal(raiz.get("sucursal").get("sucursalId"), sucursalId));
+        query.orderBy(criteriaBuilder.asc(precio.get("descri")));
+
+        return entityManager.createQuery(query).getResultList();
+    }
+
     private void agregarExclusionId(CriteriaBuilder criteriaBuilder, Root<Sucursal> raiz, Integer idExcluido,
             List<Predicate> predicados) {
         if (idExcluido != null) {
@@ -159,10 +180,6 @@ public class SucursalRepositorio {
         }
         if (filtro.ruc() != null && !filtro.ruc().isBlank()) {
             predicados.add(criteriaBuilder.like(raiz.get("ruc"), "%" + filtro.ruc() + "%"));
-        }
-        if (filtro.ciudad() != null && !filtro.ciudad().isBlank()) {
-            predicados.add(criteriaBuilder.like(criteriaBuilder.lower(raiz.get("ciudad")),
-                    "%" + filtro.ciudad().toLowerCase(Locale.ROOT) + "%"));
         }
         if (filtro.matriz() != null) {
             predicados.add(criteriaBuilder.equal(raiz.get("matriz"), filtro.matriz()));

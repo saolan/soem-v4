@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.seguridad.dto.LoginRequestDTO;
 import com.saolan.soem.seguridad.dto.MenuDTO;
@@ -70,6 +71,7 @@ class MenuControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(MenuControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -168,7 +170,7 @@ class MenuControladorIT {
                 .put(Entity.entity(new MenuDTO(idGrupo, null, descriNueva, null, false, true), MediaType.APPLICATION_JSON));
 
         assertEquals(200, respuesta.getStatus());
-        assertEquals(descriNueva, respuesta.readEntity(new GenericType<RespuestaApi<MenuDTO>>() { }).datos().descri());
+        assertEquals(descriNueva, RespuestaPrueba.leer(respuesta, new GenericType<MenuDTO>() { }).datos().descri());
     }
 
     @Test
@@ -181,8 +183,8 @@ class MenuControladorIT {
                 .delete();
         assertEquals(200, respuestaEliminar.getStatus());
 
-        RespuestaApi<MenuDTO> cuerpo = get("api/v1/menus/" + idGrupo)
-                .readEntity(new GenericType<RespuestaApi<MenuDTO>>() { });
+        RespuestaApi<MenuDTO> cuerpo = RespuestaPrueba.leer(get("api/v1/menus/" + idGrupo),
+                new GenericType<MenuDTO>() { });
         assertFalse(cuerpo.datos().estado());
     }
 
@@ -191,7 +193,7 @@ class MenuControladorIT {
         Integer idGrupo = crearMenu(null, false);
         Integer idPagina = crearMenu(idGrupo, true);
         Response respuestaRol = post("api/v1/roles", new RolDTO(null, "Rol de prueba " + UUID.randomUUID(), true));
-        Integer idRol = respuestaRol.readEntity(new GenericType<RespuestaApi<RolDTO>>() { }).datos().rolId();
+        Integer idRol = RespuestaPrueba.leer(respuestaRol, new GenericType<RolDTO>() { }).datos().rolId();
         idsRolCreados.add(idRol);
         List<AsignacionAccesoDTO> asignaciones = List.of(new AsignacionAccesoDTO(idGrupo, true),
                 new AsignacionAccesoDTO(idPagina, true));
@@ -206,7 +208,7 @@ class MenuControladorIT {
         String ruta = esPagina ? "/prueba/" + UUID.randomUUID() : null;
         Response respuesta = post("api/v1/menus", new MenuDTO(null, menuSupeId, "Menú de prueba", ruta, esPagina, true));
         assertEquals(201, respuesta.getStatus());
-        Integer id = respuesta.readEntity(new GenericType<RespuestaApi<MenuDTO>>() { }).datos().menuId();
+        Integer id = RespuestaPrueba.leer(respuesta, new GenericType<MenuDTO>() { }).datos().menuId();
         idsMenuCreados.add(id);
         return id;
     }

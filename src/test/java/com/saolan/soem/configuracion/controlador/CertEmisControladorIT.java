@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.configuracion.dto.CertEmisDTO;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
@@ -72,6 +73,7 @@ class CertEmisControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(CertEmisControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -148,7 +150,7 @@ class CertEmisControladorIT {
                 .get();
 
         assertEquals(200, respuesta.getStatus());
-        RespuestaApi<List<CertEmisDTO>> cuerpo = respuesta.readEntity(new GenericType<RespuestaApi<List<CertEmisDTO>>>() { });
+        RespuestaApi<List<CertEmisDTO>> cuerpo = RespuestaPrueba.leer(respuesta, new GenericType<List<CertEmisDTO>>() { });
         assertTrue(cuerpo.exito());
         assertNotNull(cuerpo.paginacion());
     }
@@ -165,7 +167,7 @@ class CertEmisControladorIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .put(Entity.entity(certEmisDTO(descriNueva, true), MediaType.APPLICATION_JSON));
         assertEquals(200, respuestaModificar.getStatus());
-        assertEquals(descriNueva, respuestaModificar.readEntity(new GenericType<RespuestaApi<CertEmisDTO>>() { }).datos().descri());
+        assertEquals(descriNueva, RespuestaPrueba.leer(respuestaModificar, new GenericType<CertEmisDTO>() { }).datos().descri());
 
         Response respuestaEliminar = target("api/v1/certificados-emisor/" + id)
                 .request(MediaType.APPLICATION_JSON)
@@ -175,7 +177,7 @@ class CertEmisControladorIT {
 
         Response respuestaBuscar = get("api/v1/certificados-emisor/" + id);
         assertEquals(200, respuestaBuscar.getStatus());
-        assertFalse(respuestaBuscar.readEntity(new GenericType<RespuestaApi<CertEmisDTO>>() { }).datos().estado());
+        assertFalse(RespuestaPrueba.leer(respuestaBuscar, new GenericType<CertEmisDTO>() { }).datos().estado());
     }
 
     @Test
@@ -230,7 +232,7 @@ class CertEmisControladorIT {
     }
 
     private Integer registrarParaLimpieza(Response respuestaCrear) {
-        Integer id = respuestaCrear.readEntity(new GenericType<RespuestaApi<CertEmisDTO>>() { }).datos().certEmisId();
+        Integer id = RespuestaPrueba.leer(respuestaCrear, new GenericType<CertEmisDTO>() { }).datos().certEmisId();
         idsCreados.add(id);
         return id;
     }
@@ -254,7 +256,7 @@ class CertEmisControladorIT {
         if (respuestaSucursal.getStatus() != 201) {
             return null;
         }
-        Integer sucursalId = respuestaSucursal.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { }).datos().sucursalId();
+        Integer sucursalId = RespuestaPrueba.leer(respuestaSucursal, new GenericType<SucursalDTO>() { }).datos().sucursalId();
         idsSucursalesCreadas.add(sucursalId);
 
         SucuCertEmisDTO certificado = new SucuCertEmisDTO(certEmisId, "ruta-test", "Certificado de prueba", "clave-test");
@@ -266,7 +268,7 @@ class CertEmisControladorIT {
     }
 
     private CertEmisDTO certEmisDTO(String descri, boolean estado) {
-        return new CertEmisDTO(null, descri, "CN Test", "OU Test", "O Test", "EC", "1.2.3.4", estado);
+        return new CertEmisDTO(null, descri, "CN Test", "OU Test", "O Test", "EC", "1.2.3.4", "2.5.4.97", estado);
     }
 
     private String descriAleatoria() {
