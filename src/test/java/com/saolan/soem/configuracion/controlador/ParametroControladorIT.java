@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.configuracion.dto.ParametroDTO;
 import com.saolan.soem.configuracion.modelo.Parametro;
@@ -67,6 +68,7 @@ class ParametroControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(ParametroControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -134,7 +136,7 @@ class ParametroControladorIT {
                 .get();
 
         assertEquals(200, respuesta.getStatus());
-        RespuestaApi<List<ParametroDTO>> cuerpo = respuesta.readEntity(new GenericType<RespuestaApi<List<ParametroDTO>>>() { });
+        RespuestaApi<List<ParametroDTO>> cuerpo = RespuestaPrueba.leer(respuesta, new GenericType<List<ParametroDTO>>() { });
         assertTrue(cuerpo.exito());
         assertNotNull(cuerpo.paginacion());
     }
@@ -151,7 +153,7 @@ class ParametroControladorIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .put(Entity.entity(parametroDTO(descriNueva), MediaType.APPLICATION_JSON));
         assertEquals(200, respuestaModificar.getStatus());
-        assertEquals(descriNueva, respuestaModificar.readEntity(new GenericType<RespuestaApi<ParametroDTO>>() { }).datos().descri());
+        assertEquals(descriNueva, RespuestaPrueba.leer(respuestaModificar, new GenericType<ParametroDTO>() { }).datos().descri());
 
         Response respuestaEliminar = target("api/v1/parametros/" + id)
                 .request(MediaType.APPLICATION_JSON)
@@ -161,7 +163,7 @@ class ParametroControladorIT {
 
         Response respuestaBuscar = get("api/v1/parametros/" + id);
         assertEquals(200, respuestaBuscar.getStatus());
-        assertFalse(respuestaBuscar.readEntity(new GenericType<RespuestaApi<ParametroDTO>>() { }).datos().estado());
+        assertFalse(RespuestaPrueba.leer(respuestaBuscar, new GenericType<ParametroDTO>() { }).datos().estado());
     }
 
     @Test
@@ -196,7 +198,7 @@ class ParametroControladorIT {
     }
 
     private Integer registrarParaLimpieza(Response respuestaCrear) {
-        Integer id = respuestaCrear.readEntity(new GenericType<RespuestaApi<ParametroDTO>>() { }).datos().parametroId();
+        Integer id = RespuestaPrueba.leer(respuestaCrear, new GenericType<ParametroDTO>() { }).datos().parametroId();
         idsCreados.add(id);
         return id;
     }

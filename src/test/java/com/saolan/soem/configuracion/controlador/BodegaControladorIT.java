@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.AsignacionAccesoDTO;
-import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.configuracion.dto.BodegaDTO;
 import com.saolan.soem.configuracion.dto.SucuBodeDTO;
@@ -69,6 +69,7 @@ class BodegaControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(BodegaControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -130,7 +131,14 @@ class BodegaControladorIT {
 
     @Test
     void buscar_conToken_deberiaRetornarListadoPaginado() {
-        assertEquals(200, get("api/v1/bodegas?pagina=1&tamanio=5").getStatus());
+        // queryParam y no "?…" dentro de path(): path() codifica el "?" como %3F y la ruta no existe.
+        Response respuesta = target("api/v1/bodegas")
+                .queryParam("pagina", 1)
+                .queryParam("tamanio", 5)
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .get();
+        assertEquals(200, respuesta.getStatus());
     }
 
     @Test
@@ -143,11 +151,11 @@ class BodegaControladorIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .put(Entity.entity(new BodegaDTO(id, descriNueva, true), MediaType.APPLICATION_JSON));
         assertEquals(200, respuestaModificar.getStatus());
-        assertEquals(descriNueva, respuestaModificar.readEntity(new GenericType<RespuestaApi<BodegaDTO>>() { }).datos().descri());
+        assertEquals(descriNueva, RespuestaPrueba.leer(respuestaModificar, new GenericType<BodegaDTO>() { }).datos().descri());
 
         assertEquals(200, eliminar(id).getStatus());
         Response respuestaBuscar = get("api/v1/bodegas/" + id);
-        assertFalse(respuestaBuscar.readEntity(new GenericType<RespuestaApi<BodegaDTO>>() { }).datos().estado());
+        assertFalse(RespuestaPrueba.leer(respuestaBuscar, new GenericType<BodegaDTO>() { }).datos().estado());
     }
 
     @Test
@@ -170,8 +178,8 @@ class BodegaControladorIT {
         assertEquals(200, reemplazarBodegas(sucursalId, asignaciones).getStatus());
         assertEquals(200, reemplazarBodegas(sucursalId, asignaciones).getStatus());
 
-        List<SucuBodeDTO> bodegas = get("api/v1/sucursales/" + sucursalId + "/bodegas")
-                .readEntity(new GenericType<RespuestaApi<List<SucuBodeDTO>>>() { }).datos();
+        List<SucuBodeDTO> bodegas = RespuestaPrueba.leer(get("api/v1/sucursales/" + sucursalId + "/bodegas"),
+                new GenericType<List<SucuBodeDTO>>() { }).datos();
         assertEquals(1, bodegas.size());
         assertEquals(bodegaId, bodegas.get(0).bodegaId());
 
@@ -221,7 +229,7 @@ class BodegaControladorIT {
 
     private Integer registrarParaLimpieza(Response respuestaCrear) {
         assertEquals(201, respuestaCrear.getStatus());
-        Integer id = respuestaCrear.readEntity(new GenericType<RespuestaApi<BodegaDTO>>() { }).datos().bodegaId();
+        Integer id = RespuestaPrueba.leer(respuestaCrear, new GenericType<BodegaDTO>() { }).datos().bodegaId();
         idsCreados.add(id);
         return id;
     }
@@ -242,7 +250,7 @@ class BodegaControladorIT {
         if (respuesta.getStatus() != 201) {
             return null;
         }
-        Integer sucursalId = respuesta.readEntity(new GenericType<RespuestaApi<SucursalDTO>>() { }).datos().sucursalId();
+        Integer sucursalId = RespuestaPrueba.leer(respuesta, new GenericType<SucursalDTO>() { }).datos().sucursalId();
         idsSucursalesCreadas.add(sucursalId);
         return sucursalId;
     }

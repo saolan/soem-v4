@@ -182,7 +182,7 @@ class CertEmisServicioTest {
     }
 
     private CertEmisDTO certEmisDTO(String descri, boolean estado) {
-        return new CertEmisDTO(null, descri, "CN Test", "OU Test", "O Test", "EC", "1.2.3.4", estado);
+        return new CertEmisDTO(null, descri, "CN Test", "OU Test", "O Test", "EC", "1.2.3.4", "2.5.4.97", estado);
     }
 
     private CertEmis certEmis(Integer id, String descri, boolean estado) {
@@ -194,6 +194,7 @@ class CertEmisServicioTest {
         certEmis.setCertO("O Test");
         certEmis.setCertC("EC");
         certEmis.setCertOid("1.2.3.4");
+        certEmis.setCertOrganiIden("2.5.4.97");
         certEmis.setEstado(estado);
         return certEmis;
     }

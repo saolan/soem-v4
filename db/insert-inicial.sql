@@ -1,7 +1,7 @@
 	insert into sucursal(sucursal_id, codigo, matriz, descri, ruc, razon_soci, nombre_come, ciudad, direcc, direcc_esta, telef1, telef2, correo, repres, repres_cedu, repres_dire, ruc_cont, contri_espe, obliga_cont, logoti, estado) 
 	values (1, '001', true, 'Saolan', '1700000000001', 'Razón social', 'Nombre Comercial', 'Quito', 'Quito', 'Quito','099', '098', 'correo@hotmail.com', 'S', '1700000000', 'Quito', '1700000000', null, 'false', 'C:\logo.png', true);
 	insert into bodega(bodega_id, descri, estado) values (1, 'Bodega No.1', true);
-	insert into precio(precio_id, codigo, descri, alcanc, factor, estado) values (1,'Und','Unidad',0,1,true);
+	insert into precio(precio_id, codigo, descri, alcanc, factor, estado) values (1,'Und','Unidad','NINGUNO',1,true);
 
 	insert into mesa(mesa_id, descri, estado) values (1, 'Mesa 01', true);
 

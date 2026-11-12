@@ -10,6 +10,7 @@ import com.saolan.soem.compartido.dto.RespuestaApi;
 import com.saolan.soem.compartido.seguridad.Accion;
 import com.saolan.soem.compartido.seguridad.RequierePermiso;
 import com.saolan.soem.configuracion.dto.SucuBodeDTO;
+import com.saolan.soem.configuracion.dto.SucuPrecDTO;
 import com.saolan.soem.configuracion.dto.SucuCertEmisDTO;
 import com.saolan.soem.configuracion.dto.SucursalDTO;
 import com.saolan.soem.configuracion.dto.SucursalFiltroDTO;
@@ -35,7 +36,8 @@ import jakarta.ws.rs.core.Response;
  * La composicion {@code certificadoEmisor} se administra como sub-recurso
  * propio bajo {@code /{id}/certificado-emision} (pantalla separada en el
  * frontend), no viaja embebida en {@link SucursalDTO}; igual las bodegas
- * habilitadas, bajo {@code /{id}/bodegas} (lectura y reemplazo en bloque).
+ * habilitadas, bajo {@code /{id}/bodegas}, y las listas de precio, bajo
+ * {@code /{id}/precios} (lectura y reemplazo en bloque).
  */
 @Path("/sucursales")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -58,12 +60,11 @@ public class SucursalControlador {
             @QueryParam("codigo") String codigo,
             @QueryParam("descri") String descri,
             @QueryParam("ruc") String ruc,
-            @QueryParam("ciudad") String ciudad,
             @QueryParam("matriz") Boolean matriz,
             @QueryParam("estado") Boolean estado) {
 
         ParametrosBusqueda parametrosBusqueda = new ParametrosBusqueda(pagina, tamanio, ordenarPor, direccion);
-        SucursalFiltroDTO filtro = new SucursalFiltroDTO(codigo, descri, ruc, ciudad, matriz, estado);
+        SucursalFiltroDTO filtro = new SucursalFiltroDTO(codigo, descri, ruc, matriz, estado);
 
         List<SucursalDTO> resultado = sucursalServicio.buscar(filtro, parametrosBusqueda);
         long totalRegistros = sucursalServicio.contar(filtro);
@@ -158,5 +159,21 @@ public class SucursalControlador {
     public Response reemplazarBodegas(@PathParam("id") Integer id, @Valid List<AsignacionAccesoDTO> asignaciones) {
         sucursalServicio.reemplazarBodegas(id, asignaciones);
         return Response.ok(RespuestaApi.<Void>exito(null, "Bodegas de la sucursal actualizadas correctamente")).build();
+    }
+
+    @GET
+    @Path("/{id}/precios")
+    @RequierePermiso(recurso = RECURSO, accion = Accion.BUSCAR)
+    public Response precios(@PathParam("id") Integer id) {
+        List<SucuPrecDTO> resultado = sucursalServicio.precios(id);
+        return Response.ok(RespuestaApi.exito(resultado)).build();
+    }
+
+    @PUT
+    @Path("/{id}/precios")
+    @RequierePermiso(recurso = RECURSO, accion = Accion.MODIFICAR)
+    public Response reemplazarPrecios(@PathParam("id") Integer id, @Valid List<AsignacionAccesoDTO> asignaciones) {
+        sucursalServicio.reemplazarPrecios(id, asignaciones);
+        return Response.ok(RespuestaApi.<Void>exito(null, "Listas de precio de la sucursal actualizadas correctamente")).build();
     }
 }

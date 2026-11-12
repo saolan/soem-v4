@@ -11,7 +11,7 @@ import com.saolan.soem.configuracion.modelo.Sucursal;
 
 /**
  * Mapeo entidad/DTO de {@link Sucursal}. Las composiciones
- * {@code certificadoEmisor} y {@code bodegas} no forman parte de
+ * {@code certificadoEmisor}, {@code bodegas} y {@code precios} no forman parte de
  * {@link SucursalDTO} (se administran como sub-recursos propios, ver
  * {@code SucursalServicio}); se
  * ignora explicitamente en ambas direcciones DTO -&gt; entidad para que
@@ -30,6 +30,7 @@ public interface SucursalMapeador {
     @Mapping(target = "estado", ignore = true)
     @Mapping(target = "certificadoEmisor", ignore = true)
     @Mapping(target = "bodegas", ignore = true)
+    @Mapping(target = "precios", ignore = true)
     Sucursal aSucursal(SucursalDTO sucursalDTO);
 
     SucursalDTO aSucursalDTO(Sucursal sucursal);
@@ -39,5 +40,6 @@ public interface SucursalMapeador {
     @Mapping(target = "estado", ignore = true)
     @Mapping(target = "certificadoEmisor", ignore = true)
     @Mapping(target = "bodegas", ignore = true)
+    @Mapping(target = "precios", ignore = true)
     void actualizarEntidadDesdeDto(SucursalDTO sucursalDTO, @MappingTarget Sucursal sucursal);
 }

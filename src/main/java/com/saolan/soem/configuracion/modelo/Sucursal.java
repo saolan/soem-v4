@@ -19,8 +19,8 @@ import jakarta.persistence.Table;
  * Sucursal de la empresa. Raiz del agregado configuracion/sucursal; no
  * extiende {@code EntidadAuditable} porque la tabla no tiene columnas de
  * auditoria. Se da de baja logicamente mediante {@code estado}. Es duena de
- * las composiciones {@code certificadoEmisor} ({@link SucuCertEmis}, 1:1) y
- * {@code bodegas} ({@link SucuBode}, 1:N).
+ * las composiciones {@code certificadoEmisor} ({@link SucuCertEmis}, 1:1),
+ * {@code bodegas} ({@link SucuBode}, 1:N) y {@code precios} ({@link SucuPrec}, 1:N).
  */
 @Entity
 @Table(name = "sucursal")
@@ -100,6 +100,10 @@ public class Sucursal implements Serializable {
     /** Composicion 1:N: bodegas habilitadas para la sucursal (reemplazo en bloque desde {@code SucursalServicio}). */
     @OneToMany(mappedBy = "sucursal", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SucuBode> bodegas = new ArrayList<>();
+
+    /** Composicion 1:N: listas de precio habilitadas para la sucursal (reemplazo en bloque desde {@code SucursalServicio}). */
+    @OneToMany(mappedBy = "sucursal", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<SucuPrec> precios = new ArrayList<>();
 
     public Integer getSucursalId() {
         return sucursalId;
@@ -279,6 +283,10 @@ public class Sucursal implements Serializable {
 
     public List<SucuBode> getBodegas() {
         return bodegas;
+    }
+
+    public List<SucuPrec> getPrecios() {
+        return precios;
     }
 
     /**

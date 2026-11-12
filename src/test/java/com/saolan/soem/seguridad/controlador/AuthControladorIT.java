@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.compartido.prueba.RespuestaPrueba;
 import com.saolan.soem.compartido.prueba.SesionPrueba;
 import com.saolan.soem.seguridad.dto.CambioClaveDTO;
 import com.saolan.soem.seguridad.dto.CambioSucursalDTO;
@@ -71,6 +72,7 @@ class AuthControladorIT {
         WebArchive war = ShrinkWrap.create(ZipImporter.class, "soem.war").importFrom(archivo).as(WebArchive.class);
         war.addPackage(AuthControladorIT.class.getPackage());
         war.addClass(SesionPrueba.class);
+        war.addClass(RespuestaPrueba.class);
         return war;
     }
 
@@ -161,7 +163,7 @@ class AuthControladorIT {
                 .get();
 
         assertEquals(200, respuesta.getStatus());
-        RespuestaApi<SesionActualDTO> cuerpo = respuesta.readEntity(new GenericType<RespuestaApi<SesionActualDTO>>() { });
+        RespuestaApi<SesionActualDTO> cuerpo = RespuestaPrueba.leer(respuesta, new GenericType<SesionActualDTO>() { });
         assertEquals(USUARIO_PRUEBA, cuerpo.datos().usuario());
     }
 
@@ -246,7 +248,7 @@ class AuthControladorIT {
     }
 
     private LoginRespuestaDTO cuerpoLogin(Response respuesta) {
-        RespuestaApi<LoginRespuestaDTO> cuerpo = respuesta.readEntity(new GenericType<RespuestaApi<LoginRespuestaDTO>>() { });
+        RespuestaApi<LoginRespuestaDTO> cuerpo = RespuestaPrueba.leer(respuesta, new GenericType<LoginRespuestaDTO>() { });
         return cuerpo.datos();
     }
 
