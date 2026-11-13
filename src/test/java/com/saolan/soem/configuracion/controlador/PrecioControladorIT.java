@@ -2,6 +2,7 @@ package com.saolan.soem.configuracion.controlador;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
@@ -186,20 +187,112 @@ class PrecioControladorIT {
     }
 
     @Test
-    void crear_conAlcanceTodos_deberiaHabilitarLaListaEnLasSucursalesActivas() {
-        Integer sucursalId = crearSucursal();
-        assumeTrue(sucursalId != null, "Requiere permisos para crear sucursales");
+    void crear_conAlcanceTodos_deberiaCrearPreciosSinHabilitarSucursales() {
+        long sucursalesActivas = contarNativo("SELECT count(*) FROM sucursal WHERE estado = true");
+        long productosActivos = contarNativo("SELECT count(*) FROM producto WHERE estado = true");
 
         Integer precioId = registrarParaLimpieza(crear(nuevoDTO("TODOS")));
 
-        List<SucuPrecDTO> precios = preciosDeSucursal(sucursalId);
-        assertEquals(1, precios.stream().filter(p -> p.precioId().equals(precioId) && p.acceso()).count());
-        // Habilitada en sucursales: no se puede desactivar.
-        assertEquals(409, eliminar(precioId).getStatus());
+        assertEquals(sucursalesActivas * productosActivos, contarPorPrecio("prod_prec", precioId));
+        assertEquals(0L, contarPorPrecio("sucu_prec", precioId));
     }
 
     @Test
-    void preciosDeSucursal_deberianReemplazarseLeerseYBloquearLaBaja() {
+    void crear_conAlcanceNinguno_noDeberiaCrearPrecios() {
+        Integer precioId = registrarParaLimpieza(crear(nuevoDTO("NINGUNO")));
+
+        assertEquals(0L, contarPorPrecio("prod_prec", precioId));
+        assertEquals(0L, contarPorPrecio("sucu_prec", precioId));
+    }
+
+    @Test
+    void crear_conEstadoFalseYFactorDecimal_deberiaCrearLaListaActiva() {
+        Response respuesta = crear(new PrecioDTO(null, codigoAleatorio(), descriAleatoria(), "NINGUNO",
+                new BigDecimal("0.001"), false));
+        respuesta.bufferEntity();
+        Integer precioId = registrarParaLimpieza(respuesta);
+
+        PrecioDTO creado = RespuestaPrueba.leer(respuesta, new GenericType<PrecioDTO>() { }).datos();
+        assertTrue(creado.estado());
+        assertEquals(0, new BigDecimal("0.001").compareTo(creado.factor()));
+        assertTrue(leerPrecio(precioId).estado());
+    }
+
+    @Test
+    void crear_deberiaResponderFactorComoStringDecimal() {
+        Response respuesta = crear(nuevoDTO("NINGUNO"));
+        respuesta.bufferEntity();
+        registrarParaLimpieza(respuesta);
+
+        // Se lee el JSON crudo: el DTO aplicaria el adaptador y ocultaria la representacion.
+        String json = respuesta.readEntity(String.class);
+        assertTrue(json.contains("\"factor\":\"12\""), "factor debe viajar como string decimal: " + json);
+    }
+
+    @Test
+    void crear_conFactorNoNumerico_deberiaRetornar400ConElCampo() {
+        String cuerpo = "{\"codigo\":\"" + codigoAleatorio() + "\",\"descri\":\"" + descriAleatoria()
+                + "\",\"alcanc\":\"NINGUNO\",\"factor\":\"abc\"}";
+        Response respuesta = target("api/v1/precios")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .post(Entity.entity(cuerpo, MediaType.APPLICATION_JSON));
+
+        assertEquals(400, respuesta.getStatus());
+        String json = respuesta.readEntity(String.class);
+        assertTrue(json.contains("\"campo\":\"factor\""), json);
+    }
+
+    @Test
+    void modificar_listaTodos_noDeberiaCrearPreciosNiCambiarElEstado() {
+        Integer precioId = registrarParaLimpieza(crear(nuevoDTO("TODOS")));
+        long prodPrecAntes = contarPorPrecio("prod_prec", precioId);
+        PrecioDTO cambios = new PrecioDTO(null, codigoAleatorio(), descriAleatoria(), "NINGUNO", BigDecimal.ONE, false);
+
+        Response respuesta = target("api/v1/precios/" + precioId)
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .put(Entity.entity(cambios, MediaType.APPLICATION_JSON));
+
+        assertEquals(200, respuesta.getStatus());
+        PrecioDTO modificado = leerPrecio(precioId);
+        assertEquals(cambios.codigo(), modificado.codigo());
+        assertEquals("TODOS", modificado.alcanc());
+        assertTrue(modificado.estado());
+        assertEquals(prodPrecAntes, contarPorPrecio("prod_prec", precioId));
+    }
+
+    @Test
+    void eliminarYActivar_deberianFuncionarAunqueEsteHabilitadaEnSucursales() {
+        Integer precioId = registrarParaLimpieza(crear(nuevoDTO("NINGUNO")));
+        Integer sucursalId = crearSucursal();
+        assumeTrue(sucursalId != null, "Requiere permisos para crear sucursales");
+        assertEquals(200, reemplazarPrecios(sucursalId, List.of(new AsignacionAccesoDTO(precioId, true))).getStatus());
+
+        // Sin restriccion: se elimina aunque este habilitada en una sucursal.
+        assertEquals(200, eliminar(precioId).getStatus());
+        assertFalse(leerPrecio(precioId).estado());
+
+        Response respuestaActivar = target("api/v1/precios/" + precioId + "/activar")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .put(Entity.json(""));
+        assertEquals(200, respuestaActivar.getStatus());
+        assertTrue(leerPrecio(precioId).estado());
+    }
+
+    @Test
+    void activar_deberiaRetornar404_cuandoNoExiste() {
+        Response respuesta = target("api/v1/precios/" + Integer.MAX_VALUE + "/activar")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .put(Entity.json(""));
+
+        assertEquals(404, respuesta.getStatus());
+    }
+
+    @Test
+    void preciosDeSucursal_deberianReemplazarseYLeerse() {
         Integer precioId = registrarParaLimpieza(crear(nuevoDTO("NINGUNO")));
         Integer sucursalId = crearSucursal();
         assumeTrue(sucursalId != null, "Requiere permisos para crear sucursales");
@@ -212,10 +305,8 @@ class PrecioControladorIT {
         assertEquals(1, precios.size());
         assertEquals(precioId, precios.get(0).precioId());
 
-        assertEquals(409, eliminar(precioId).getStatus());
-
         assertEquals(200, reemplazarPrecios(sucursalId, List.of()).getStatus());
-        assertEquals(200, eliminar(precioId).getStatus());
+        assertTrue(preciosDeSucursal(sucursalId).isEmpty());
     }
 
     // ---------- helpers ----------
@@ -287,6 +378,21 @@ class PrecioControladorIT {
         Integer sucursalId = RespuestaPrueba.leer(respuesta, new GenericType<SucursalDTO>() { }).datos().sucursalId();
         idsSucursalesCreadas.add(sucursalId);
         return sucursalId;
+    }
+
+    private PrecioDTO leerPrecio(Integer precioId) {
+        return RespuestaPrueba.leer(get("api/v1/precios/" + precioId), new GenericType<PrecioDTO>() { }).datos();
+    }
+
+    private long contarPorPrecio(String tabla, Integer precioId) {
+        // tabla es una constante del propio test, nunca un dato externo.
+        return ((Number) entityManager.createNativeQuery("SELECT count(*) FROM " + tabla + " WHERE precio_id = ?1")
+                .setParameter(1, precioId)
+                .getSingleResult()).longValue();
+    }
+
+    private long contarNativo(String sql) {
+        return ((Number) entityManager.createNativeQuery(sql).getSingleResult()).longValue();
     }
 
     private PrecioDTO nuevoDTO(String alcanc) {

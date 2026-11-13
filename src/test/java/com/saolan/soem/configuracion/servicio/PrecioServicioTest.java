@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -89,24 +91,30 @@ class PrecioServicioTest {
         assertEquals("DOC", creado.codigo());
         assertEquals("Docena", creado.descri());
         verify(precioRepositorio).crear(any(Precio.class));
-        verify(precioRepositorio, never()).habilitarEnSucursalesActivas(any());
         verify(precioRepositorio, never()).crearPreciosEnCeroDeProductosActivos(any());
     }
 
     @Test
-    void crear_conAlcanceTodos_deberiaHabilitarSucursalesYGenerarPrecios() {
+    void crear_conAlcanceTodos_deberiaGenerarPrecios() {
         doAnswer(invocacion -> {
             invocacion.<Precio>getArgument(0).setPrecioId(7);
             return null;
         }).when(precioRepositorio).crear(any(Precio.class));
-        when(precioRepositorio.habilitarEnSucursalesActivas(7)).thenReturn(2);
         when(precioRepositorio.crearPreciosEnCeroDeProductosActivos(7)).thenReturn(50);
 
         PrecioDTO creado = precioServicio.crear(nuevoDTO("MAY", "Mayorista", "TODOS", true));
 
         assertEquals(7, creado.precioId());
-        verify(precioRepositorio).habilitarEnSucursalesActivas(7);
         verify(precioRepositorio).crearPreciosEnCeroDeProductosActivos(7);
+        verify(precioRepositorio, never()).actualizarAccesoEnRoles(any(), anyBoolean());
+    }
+
+    @Test
+    void crear_deberiaCrearActiva_aunqueElDtoIndiqueInactiva() {
+        PrecioDTO creado = precioServicio.crear(nuevoDTO("MAY", "Mayorista", "NINGUNO", false));
+
+        assertTrue(creado.estado());
+        verify(precioRepositorio).crear(argThat(precio -> Boolean.TRUE.equals(precio.getEstado())));
     }
 
     @Test
@@ -135,46 +143,84 @@ class PrecioServicioTest {
         assertEquals("Unidad suelta", modificado.descri());
         assertEquals(0, new BigDecimal("2").compareTo(modificado.factor()));
         assertEquals(AlcancePrecio.NINGUNO, precio.getAlcanc());
-        verify(precioRepositorio, never()).contarSucursalesAsignadas(1);
-        verify(precioRepositorio, never()).crearPreciosEnCeroDeProductosActivos(any());
+        verificarQueModificarNoTocaNada();
     }
 
     @Test
-    void modificar_deberiaLanzarConflicto_cuandoSeDesactivaConSucursalesAsignadas() {
+    void modificar_listaTodos_cambiandoCodigoYDescri_noDeberiaGenerarPrecios() {
+        Precio precio = nuevoPrecio(1, "MAY", "Mayorista", AlcancePrecio.TODOS, true);
+        when(precioRepositorio.buscarPorId(1)).thenReturn(Optional.of(precio));
+
+        PrecioDTO modificado = precioServicio.modificar(1, nuevoDTO("MAY2", "Mayorista 2", "NINGUNO", true));
+
+        assertEquals("MAY2", modificado.codigo());
+        assertEquals(AlcancePrecio.TODOS, precio.getAlcanc());
+        verificarQueModificarNoTocaNada();
+    }
+
+    @Test
+    void modificar_conEstadoFalse_noDeberiaDesactivar() {
         Precio precio = nuevoPrecio(1, "Und", "Unidad", true);
         when(precioRepositorio.buscarPorId(1)).thenReturn(Optional.of(precio));
-        when(precioRepositorio.contarSucursalesAsignadas(1)).thenReturn(2L);
 
-        ExcepcionConflicto excepcion = assertThrows(ExcepcionConflicto.class,
-                () -> precioServicio.modificar(1, nuevoDTO("Und", "Unidad", "NINGUNO", false)));
+        precioServicio.modificar(1, nuevoDTO("Und", "Unidad", "NINGUNO", false));
 
-        assertEquals("estado", excepcion.getErrores().get(0).campo());
         assertTrue(precio.getEstado());
+        verificarQueModificarNoTocaNada();
     }
 
-    // ---------- eliminar ----------
+    @Test
+    void modificar_conEstadoTrue_noDeberiaReactivar() {
+        Precio precio = nuevoPrecio(1, "Und", "Unidad", false);
+        when(precioRepositorio.buscarPorId(1)).thenReturn(Optional.of(precio));
+
+        precioServicio.modificar(1, nuevoDTO("Und", "Unidad", "NINGUNO", true));
+
+        assertFalse(precio.getEstado());
+        verificarQueModificarNoTocaNada();
+    }
+
+    // ---------- eliminar y activar ----------
 
     @Test
-    void eliminar_deberiaMarcarEstadoFalse_cuandoNoTieneSucursales() {
+    void eliminar_deberiaDesactivarYQuitarElAccesoDeLosRoles_sinRestriccion() {
         Precio precio = nuevoPrecio(1, "Und", "Unidad", true);
         when(precioRepositorio.buscarPorId(1)).thenReturn(Optional.of(precio));
-        when(precioRepositorio.contarSucursalesAsignadas(1)).thenReturn(0L);
+        when(precioRepositorio.actualizarAccesoEnRoles(1, false)).thenReturn(3);
 
         precioServicio.eliminar(1);
 
         assertFalse(precio.getEstado());
+        verify(precioRepositorio).actualizarAccesoEnRoles(1, false);
     }
 
     @Test
-    void eliminar_deberiaLanzarConflicto_cuandoTieneSucursalesAsignadas() {
-        Precio precio = nuevoPrecio(1, "Und", "Unidad", true);
+    void eliminar_deberiaLanzarNoEncontrado_cuandoNoExiste() {
+        when(precioRepositorio.buscarPorId(99)).thenReturn(Optional.empty());
+
+        assertThrows(ExcepcionNoEncontrado.class, () -> precioServicio.eliminar(99));
+        verify(precioRepositorio, never()).actualizarAccesoEnRoles(any(), anyBoolean());
+    }
+
+    @Test
+    void activar_deberiaActivarYRestablecerElAccesoDeLosRoles() {
+        Precio precio = nuevoPrecio(1, "MAY", "Mayorista", AlcancePrecio.TODOS, false);
         when(precioRepositorio.buscarPorId(1)).thenReturn(Optional.of(precio));
-        when(precioRepositorio.contarSucursalesAsignadas(1)).thenReturn(1L);
 
-        ExcepcionConflicto excepcion = assertThrows(ExcepcionConflicto.class, () -> precioServicio.eliminar(1));
+        PrecioDTO activado = precioServicio.activar(1);
 
-        assertTrue(excepcion.getErrores().get(0).detalle().contains("1 sucursal;"));
         assertTrue(precio.getEstado());
+        assertTrue(activado.estado());
+        verify(precioRepositorio).actualizarAccesoEnRoles(1, true);
+        verify(precioRepositorio, never()).crearPreciosEnCeroDeProductosActivos(any());
+    }
+
+    @Test
+    void activar_deberiaLanzarNoEncontrado_cuandoNoExiste() {
+        when(precioRepositorio.buscarPorId(99)).thenReturn(Optional.empty());
+
+        assertThrows(ExcepcionNoEncontrado.class, () -> precioServicio.activar(99));
+        verify(precioRepositorio, never()).actualizarAccesoEnRoles(any(), anyBoolean());
     }
 
     // ---------- helpers ----------
@@ -183,12 +229,22 @@ class PrecioServicioTest {
         return new PrecioDTO(null, codigo, descri, alcanc, BigDecimal.ONE, estado);
     }
 
+    /** Modificar no crea precios ni toca el acceso de los roles. */
+    private void verificarQueModificarNoTocaNada() {
+        verify(precioRepositorio, never()).crearPreciosEnCeroDeProductosActivos(any());
+        verify(precioRepositorio, never()).actualizarAccesoEnRoles(any(), anyBoolean());
+    }
+
     private Precio nuevoPrecio(Integer precioId, String codigo, String descri, boolean estado) {
+        return nuevoPrecio(precioId, codigo, descri, AlcancePrecio.NINGUNO, estado);
+    }
+
+    private Precio nuevoPrecio(Integer precioId, String codigo, String descri, AlcancePrecio alcanc, boolean estado) {
         Precio precio = new Precio();
         precio.setPrecioId(precioId);
         precio.setCodigo(codigo);
         precio.setDescri(descri);
-        precio.setAlcanc(AlcancePrecio.NINGUNO);
+        precio.setAlcanc(alcanc);
         precio.setFactor(BigDecimal.ONE);
         precio.setEstado(estado);
         return precio;
