@@ -175,6 +175,14 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Jakarta JSON Binding: adaptadores de serializacion de los DTO
+             (p. ej. compartido.dto.DecimalTextoAdaptador). Lo aporta WildFly (Yasson). -->
+        <dependency>
+            <groupId>jakarta.json.bind</groupId>
+            <artifactId>jakarta.json.bind-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- SPI de RESTEasy (provided, lo aporta WildFly): solo para mapear
              ResteasyViolationException, cuyo mapper incorporado responde con
              su propio formato e incluye el valor rechazado. Ver
@@ -272,6 +280,13 @@
         <dependency>
             <groupId>org.eclipse.parsson</groupId>
             <artifactId>parsson</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Yasson (implementacion de JSON-B) para probar la serializacion de
+             los DTO fuera del contenedor. Version gestionada por el BOM de WildFly. -->
+        <dependency>
+            <groupId>org.eclipse</groupId>
+            <artifactId>yasson</artifactId>
             <scope>test</scope>
         </dependency>
 

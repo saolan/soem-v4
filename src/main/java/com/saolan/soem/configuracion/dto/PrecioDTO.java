@@ -2,6 +2,9 @@ package com.saolan.soem.configuracion.dto;
 
 import java.math.BigDecimal;
 
+import com.saolan.soem.compartido.dto.DecimalTextoAdaptador;
+
+import jakarta.json.bind.annotation.JsonbTypeAdapter;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -17,7 +20,12 @@ import jakarta.validation.constraints.Size;
  *                 productos activos al crear la lista, {@code "NINGUNO"} no
  *                 genera nada; se ignora en PUT (inmutable). Ver
  *                 {@code AlcancePrecio}
- * @param factor   unidades que representa la lista (Unidad = 1, Docena = 12)
+ * @param factor   unidades que representa la lista (Unidad = 1, Docena = 12);
+ *                 mayor que cero, admite decimales (p. ej. 0.001); viaja
+ *                 como string decimal en el JSON ({@code "12"})
+ * @param estado   de solo lectura; ignorado en el cuerpo de POST/PUT (toda
+ *                 lista nace activa y solo cambia con {@code DELETE} y
+ *                 {@code PUT /precios/{id}/activar})
  */
 public record PrecioDTO(
 
@@ -39,8 +47,8 @@ public record PrecioDTO(
         @NotNull(message = "El factor es obligatorio")
         @DecimalMin(value = "0", inclusive = false, message = "El factor debe ser mayor que cero")
         @Digits(integer = 6, fraction = 6, message = "El factor admite hasta 6 enteros y 6 decimales")
+        @JsonbTypeAdapter(DecimalTextoAdaptador.class)
         BigDecimal factor,
 
-        @NotNull(message = "El estado es obligatorio")
         Boolean estado) {
 }

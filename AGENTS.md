@@ -118,6 +118,23 @@ Reglas:
 - `paginacion` solo debe estar presente en respuestas paginadas.
 - Nunca incluyas trazas, consultas SQL o información sensible en las respuestas.
 
+### Decimales (`BigDecimal`) en JSON
+
+Todo campo `BigDecimal` de un DTO representa un importe, una cantidad o un valor usado en cálculos, y viaja en el JSON como **string decimal**, nunca como número JSON: el tipo `Number` de JavaScript pierde precisión con los decimales.
+
+```json
+{ "factor": "12", "precioConImpu": "15.75", "cantid": "0.001" }
+```
+
+Reglas:
+
+- Anota cada campo `BigDecimal` de los DTO (entrada y salida) con `@JsonbTypeAdapter(DecimalTextoAdaptador.class)` (`com.saolan.soem.compartido.dto`). Mantén además sus validaciones (`@NotNull`, `@DecimalMin`, `@Digits`…).
+- Solo cambia la representación JSON: en la base el campo sigue siendo `NUMERIC` y en Java `BigDecimal`. Los cálculos se hacen en el backend.
+- Salida sin ceros de relleno ni notación científica (`12.000000` → `"12"`, `1E+1` → `"10"`).
+- Un texto no numérico responde 400 con el campo afectado (lo resuelve `ManejadorGlobalExcepciones`), nunca 500. Al leer, también se acepta un número JSON, por compatibilidad.
+- No aplica a enteros (`Integer`, `Long`): viajan como número JSON.
+- Pruebas: en cada DTO nuevo, verificar con `Jsonb` que el campo se serializa como string.
+
 ## PERSISTENCIA Y OPTIMIZACIÓN DE HIBERNATE
 
 - Utiliza consultas parametrizadas; nunca concatenes datos recibidos del usuario en SQL o JPQL.
