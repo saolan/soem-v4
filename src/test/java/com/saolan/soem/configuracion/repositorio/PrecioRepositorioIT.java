@@ -3,6 +3,7 @@ package com.saolan.soem.configuracion.repositorio;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
 import java.math.BigDecimal;
@@ -72,6 +73,7 @@ class PrecioRepositorioIT {
                 // Las filas generadas por el alcance "todos" referencian a PRECIO.
                 entityManager.createNativeQuery("DELETE FROM prod_prec WHERE precio_id = ?1").setParameter(1, id).executeUpdate();
                 entityManager.createNativeQuery("DELETE FROM sucu_prec WHERE precio_id = ?1").setParameter(1, id).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM rol_prec WHERE precio_id = ?1").setParameter(1, id).executeUpdate();
                 Precio precio = entityManager.find(Precio.class, id);
                 if (precio != null) {
                     entityManager.remove(precio);
@@ -129,17 +131,67 @@ class PrecioRepositorioIT {
     @Test
     void alcanceTodos_deberiaGenerarPreciosEnCeroParaProductosYSucursalesActivos() {
         Precio precio = crear(nuevoPrecio(true));
+        Integer precioId = precio.getPrecioId();
         long sucursalesActivas = contarNativo("SELECT count(*) FROM sucursal WHERE estado = true");
         long productosActivos = contarNativo("SELECT count(*) FROM producto WHERE estado = true");
 
-        int sucursales = ejecutarEnTransaccion(() -> precioRepositorio.habilitarEnSucursalesActivas(precio.getPrecioId()));
-        int precios = ejecutarEnTransaccion(() -> precioRepositorio.crearPreciosEnCeroDeProductosActivos(precio.getPrecioId()));
+        int precios = ejecutarEnTransaccion(() -> precioRepositorio.crearPreciosEnCeroDeProductosActivos(precioId));
 
-        assertEquals(sucursalesActivas, sucursales);
         assertEquals(sucursalesActivas * productosActivos, precios);
-        assertEquals(sucursalesActivas, precioRepositorio.contarSucursalesAsignadas(precio.getPrecioId()));
-        assertEquals(0L, contarNativo("SELECT count(*) FROM prod_prec WHERE precio_id = " + precio.getPrecioId()
-                + " AND (factor <> 1 OR utilid <> 0 OR precio_sin_impu <> 0 OR precio_con_impu <> 0)"));
+        assertEquals(0L, contarPorPrecio("sucu_prec", precioId));
+        assertEquals(0L, ((Number) entityManager.createNativeQuery("""
+                        SELECT count(*) FROM prod_prec
+                         WHERE precio_id = ?1
+                           AND (factor <> 1 OR utilid <> 0 OR precio_sin_impu <> 0 OR precio_con_impu <> 0)
+                        """)
+                .setParameter(1, precioId)
+                .getSingleResult()).longValue());
+        // Idempotente: un segundo llamado no duplica.
+        assertEquals(0, ejecutarEnTransaccion(() -> precioRepositorio.crearPreciosEnCeroDeProductosActivos(precioId)));
+    }
+
+    @Test
+    void actualizarAccesoEnRoles_deberiaAfectarSoloLasFilasDeLaLista() {
+        assumeTrue(contarNativo("SELECT count(*) FROM rol") > 0 && contarNativo("SELECT count(*) FROM sucursal") > 0,
+                "Requiere al menos un rol y una sucursal en la base");
+        Precio precio = crear(nuevoPrecio(true));
+        Precio otra = crear(nuevoPrecio(true));
+        asignarARol(precio.getPrecioId());
+        asignarARol(otra.getPrecioId());
+
+        assertEquals(1, ejecutarEnTransaccion(() -> precioRepositorio.actualizarAccesoEnRoles(precio.getPrecioId(), false)));
+        assertEquals(0L, contarAccesosDeRol(precio.getPrecioId(), true));
+        assertEquals(1L, contarAccesosDeRol(otra.getPrecioId(), true));
+        // Solo cambia las filas que difieren: repetir no toca nada.
+        assertEquals(0, ejecutarEnTransaccion(() -> precioRepositorio.actualizarAccesoEnRoles(precio.getPrecioId(), false)));
+
+        assertEquals(1, ejecutarEnTransaccion(() -> precioRepositorio.actualizarAccesoEnRoles(precio.getPrecioId(), true)));
+        assertEquals(1L, contarAccesosDeRol(precio.getPrecioId(), true));
+    }
+
+    /** ROL_PREC aun no tiene entidad: se inserta por SQL con el primer rol y la primera sucursal existentes. */
+    private void asignarARol(Integer precioId) {
+        ejecutarEnTransaccion(() -> entityManager.createNativeQuery("""
+                        INSERT INTO rol_prec (sucursal_id, rol_id, precio_id, predet, acceso)
+                        SELECT (SELECT min(sucursal_id) FROM sucursal), (SELECT min(rol_id) FROM rol), ?1, false, true
+                        """)
+                .setParameter(1, precioId)
+                .executeUpdate());
+    }
+
+    private long contarAccesosDeRol(Integer precioId, boolean acceso) {
+        return ((Number) entityManager.createNativeQuery(
+                        "SELECT count(*) FROM rol_prec WHERE precio_id = ?1 AND acceso = ?2")
+                .setParameter(1, precioId)
+                .setParameter(2, acceso)
+                .getSingleResult()).longValue();
+    }
+
+    private long contarPorPrecio(String tabla, Integer precioId) {
+        // tabla es una constante del propio test, nunca un dato externo.
+        return ((Number) entityManager.createNativeQuery("SELECT count(*) FROM " + tabla + " WHERE precio_id = ?1")
+                .setParameter(1, precioId)
+                .getSingleResult()).longValue();
     }
 
     private long contarNativo(String sql) {

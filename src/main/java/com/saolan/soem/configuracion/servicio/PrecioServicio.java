@@ -26,13 +26,19 @@ import jakarta.transaction.Transactional;
  * <ul>
  * <li>{@code codigo} y {@code descri} unicos (sin distinguir mayusculas y
  * sin espacios en los extremos); el DDL no declara esas restricciones.</li>
- * <li>Alcance {@link AlcancePrecio#TODOS}: en la misma
- * transaccion del alta, la lista se habilita en todas las sucursales activas
- * y se crea el precio en cero de cada producto activo en cada una. Con
- * {@link AlcancePrecio#NINGUNO} no se genera nada. El alcance es inmutable.</li>
- * <li>Una lista habilitada en alguna sucursal ({@code SUCU_PREC} con
- * {@code acceso}) no puede desactivarse, ni por DELETE ni por un PUT con
- * {@code estado=false}: primero debe quitarse de esas sucursales.</li>
+ * <li>Alta: la lista nace activa ({@code estado = true}, se ignora el
+ * enviado). Con {@link AlcancePrecio#TODOS}, en la misma transaccion, se crea
+ * el precio en cero de cada producto activo en cada sucursal activa
+ * ({@code PROD_PREC}); con {@link AlcancePrecio#NINGUNO} no se crea nada. El
+ * alta no habilita la lista en sucursales ({@code SUCU_PREC}).</li>
+ * <li>Modificar: cambia {@code codigo}, {@code descri} y {@code factor};
+ * {@code alcanc} (inmutable) y {@code estado} se ignoran. Nunca crea
+ * precios.</li>
+ * <li>{@code estado} solo cambia con {@link #eliminar(Integer)} y
+ * {@link #activar(Integer)}, igual que en sucursal y sin restricciones: al
+ * eliminar, los roles pierden el acceso a la lista ({@code ROL_PREC.acceso =
+ * false}); al activar, lo recuperan en todas sus filas ({@code acceso =
+ * true}).</li>
  * </ul>
  */
 @ApplicationScoped
@@ -70,40 +76,46 @@ public class PrecioServicio {
         validarUnicidad(normalizado.codigo(), normalizado.descri(), null);
 
         Precio precio = precioMapeador.aPrecio(normalizado);
+        precio.setEstado(Boolean.TRUE);
         precioRepositorio.crear(precio);
         if (precio.getAlcanc() == AlcancePrecio.TODOS) {
-            generarAlcanceTodos(precio.getPrecioId());
+            int precios = precioRepositorio.crearPreciosEnCeroDeProductosActivos(precio.getPrecioId());
+            LOGGER.log(Level.INFO, "Lista de precio {0} con alcance todos: {1} precios creados",
+                    new Object[] { precio.getPrecioId(), precios });
         }
         return precioMapeador.aPrecioDTO(precio);
     }
 
-    /** {@code alcanc} se ignora: es inmutable (ver {@link PrecioMapeador}). */
+    /** {@code alcanc} y {@code estado} se ignoran (ver {@link PrecioMapeador}). */
     @Transactional
     public PrecioDTO modificar(Integer precioId, PrecioDTO precioDTO) {
         Precio precio = obtenerOFallar(precioId);
         PrecioDTO normalizado = normalizar(precioDTO);
         validarUnicidad(normalizado.codigo(), normalizado.descri(), precioId);
 
-        if (Boolean.TRUE.equals(precio.getEstado()) && Boolean.FALSE.equals(normalizado.estado())) {
-            validarSinSucursalesAsignadas(precioId);
-        }
-
         precioMapeador.actualizarEntidadDesdeDto(normalizado, precio);
         return precioMapeador.aPrecioDTO(precio);
     }
 
+    /** Borrado logico sin restriccion; idempotente si ya estaba inactiva. */
     @Transactional
     public void eliminar(Integer precioId) {
         Precio precio = obtenerOFallar(precioId);
-        validarSinSucursalesAsignadas(precioId);
         precio.setEstado(Boolean.FALSE);
+        int roles = precioRepositorio.actualizarAccesoEnRoles(precioId, false);
+        LOGGER.log(Level.INFO, "Lista de precio {0} eliminada: acceso quitado en {1} asignaciones de rol",
+                new Object[] { precioId, roles });
     }
 
-    private void generarAlcanceTodos(Integer precioId) {
-        int sucursales = precioRepositorio.habilitarEnSucursalesActivas(precioId);
-        int precios = precioRepositorio.crearPreciosEnCeroDeProductosActivos(precioId);
-        LOGGER.log(Level.INFO, "Lista de precio {0} con alcance todos: habilitada en {1} sucursales, {2} precios creados",
-                new Object[] { precioId, sucursales, precios });
+    /** Revierte el borrado logico; idempotente si ya estaba activa. */
+    @Transactional
+    public PrecioDTO activar(Integer precioId) {
+        Precio precio = obtenerOFallar(precioId);
+        precio.setEstado(Boolean.TRUE);
+        int roles = precioRepositorio.actualizarAccesoEnRoles(precioId, true);
+        LOGGER.log(Level.INFO, "Lista de precio {0} activada: acceso restablecido en {1} asignaciones de rol",
+                new Object[] { precioId, roles });
+        return precioMapeador.aPrecioDTO(precio);
     }
 
     private Precio obtenerOFallar(Integer precioId) {
@@ -127,17 +139,6 @@ public class PrecioServicio {
         }
         if (!errores.isEmpty()) {
             throw new ExcepcionConflicto("La lista de precio entra en conflicto con datos existentes", errores);
-        }
-    }
-
-    private void validarSinSucursalesAsignadas(Integer precioId) {
-        long sucursalesAsignadas = precioRepositorio.contarSucursalesAsignadas(precioId);
-        if (sucursalesAsignadas > 0) {
-            String detalle = "La lista de precio está habilitada en " + sucursalesAsignadas
-                    + (sucursalesAsignadas == 1 ? " sucursal" : " sucursales")
-                    + "; quítela de ellas antes de desactivarla";
-            throw new ExcepcionConflicto("No se puede desactivar la lista de precio",
-                    List.of(new ErrorCampo("estado", detalle)));
         }
     }
 }
