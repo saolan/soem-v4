@@ -10,7 +10,6 @@ import com.saolan.soem.compartido.dto.ComboDTO;
 import com.saolan.soem.compartido.dto.ParametrosBusqueda;
 import com.saolan.soem.configuracion.dto.PrecioFiltroDTO;
 import com.saolan.soem.configuracion.modelo.Precio;
-import com.saolan.soem.configuracion.modelo.SucuPrec;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
@@ -24,9 +23,9 @@ import jakarta.persistence.criteria.Root;
 /**
  * Acceso a datos de {@link Precio} mediante Criteria API: busqueda
  * paginada/filtrada, combo de solo lectura, consultas auxiliares para las
- * reglas de {@code PrecioServicio} (unicidad de {@code codigo}/{@code descri}
- * y uso de la lista en {@code SUCU_PREC}) y la generacion masiva del alcance
- * "todos".
+ * reglas de {@code PrecioServicio} (unicidad de {@code codigo}/{@code descri}),
+ * la generacion masiva de precios en cero del alcance "todos" y el acceso de
+ * los roles a la lista ({@code ROL_PREC}).
  */
 @ApplicationScoped
 public class PrecioRepositorio {
@@ -42,14 +41,11 @@ public class PrecioRepositorio {
      * modulo inventario y aun no tiene entidad. El unico dato variable va como
      * parametro posicional; usuari_regi/fecha_hora_regi los completan los
      * DEFAULT de la tabla (V6, usuario de la aplicacion).
+     *
+     * Idempotente (NOT EXISTS): un segundo llamado no duplica filas. El
+     * anti-join usa ix_prod_prec_precio_id y, para una lista recien creada,
+     * no encuentra filas.
      */
-    private static final String SQL_HABILITAR_EN_SUCURSALES_ACTIVAS = """
-            INSERT INTO sucu_prec (sucursal_id, precio_id, acceso)
-            SELECT s.sucursal_id, ?1, true
-              FROM sucursal s
-             WHERE s.estado = true
-            """;
-
     private static final String SQL_CREAR_PRECIOS_EN_CERO = """
             INSERT INTO prod_prec (sucursal_id, precio_id, producto_id, factor, utilid,
                                    precio_sin_impu, precio_con_impu)
@@ -58,6 +54,21 @@ public class PrecioRepositorio {
              CROSS JOIN sucursal s
              WHERE p.estado = true
                AND s.estado = true
+               AND NOT EXISTS (SELECT 1 FROM prod_prec pp
+                                WHERE pp.sucursal_id = s.sucursal_id AND pp.precio_id = ?1
+                                  AND pp.producto_id = p.producto_id)
+            """;
+
+    /*
+     * ROL_PREC (acceso de cada rol a la lista por sucursal) aun no tiene
+     * entidad: se actualiza en bloque por SQL nativo parametrizado. Solo toca
+     * las filas que cambian.
+     */
+    private static final String SQL_ACTUALIZAR_ACCESO_EN_ROLES = """
+            UPDATE rol_prec
+               SET acceso = ?2
+             WHERE precio_id = ?1
+               AND acceso <> ?2
             """;
 
     @PersistenceContext
@@ -83,30 +94,16 @@ public class PrecioRepositorio {
     }
 
     /**
-     * Cuenta las sucursales que tienen la lista habilitada
-     * ({@code SUCU_PREC.acceso = true}); se usa para impedir su desactivacion.
-     */
-    public long contarSucursalesAsignadas(Integer precioId) {
-        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Long> query = criteriaBuilder.createQuery(Long.class);
-        Root<SucuPrec> raiz = query.from(SucuPrec.class);
-
-        query.select(criteriaBuilder.count(raiz));
-        query.where(
-                criteriaBuilder.equal(raiz.get("precio").get("precioId"), precioId),
-                criteriaBuilder.isTrue(raiz.get("acceso")));
-
-        return entityManager.createQuery(query).getSingleResult();
-    }
-
-    /**
-     * Habilita la lista en todas las sucursales activas.
+     * Marca {@code acceso} en todas las filas de {@code ROL_PREC} de la lista:
+     * {@code false} al eliminarla (los roles pierden el acceso) y {@code true}
+     * al reactivarla.
      *
-     * @return cantidad de sucursales en las que se habilito
+     * @return cantidad de filas actualizadas
      */
-    public int habilitarEnSucursalesActivas(Integer precioId) {
-        return entityManager.createNativeQuery(SQL_HABILITAR_EN_SUCURSALES_ACTIVAS)
+    public int actualizarAccesoEnRoles(Integer precioId, boolean acceso) {
+        return entityManager.createNativeQuery(SQL_ACTUALIZAR_ACCESO_EN_ROLES)
                 .setParameter(1, precioId)
+                .setParameter(2, acceso)
                 .executeUpdate();
     }
 

@@ -3,10 +3,13 @@ package com.saolan.soem.compartido.excepcion;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.saolan.soem.compartido.dto.ErrorCampo;
 import com.saolan.soem.compartido.dto.RespuestaApi;
 
+import jakarta.json.bind.JsonbException;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
@@ -26,8 +29,19 @@ public class ManejadorGlobalExcepciones implements ExceptionMapper<Throwable> {
     private static final String MENSAJE_ERROR_INTERNO =
             "Ocurrió un error interno. Contacte al administrador del sistema.";
 
+    /**
+     * Yasson solo informa la propiedad que fallo en el mensaje de su
+     * {@link JsonbException} ({@code Unable to deserialize property 'factor' ...}).
+     * Si el formato cambia, el error se reporta sin campo, pero sigue siendo 400.
+     */
+    private static final Pattern PROPIEDAD_YASSON = Pattern.compile("property '([A-Za-z0-9_]+)'");
+
     @Override
     public Response toResponse(Throwable excepcion) {
+        // Antes que WebApplicationException: RESTEasy puede envolver el error de lectura del JSON en una.
+        if (contieneCausa(excepcion, ExcepcionDecimalInvalido.class)) {
+            return respuestaDeValidacion(List.of(errorDecimalInvalido(propiedadJsonInvalida(excepcion))));
+        }
         if (excepcion instanceof ExcepcionValidacion excepcionValidacion) {
             return construir(Response.Status.BAD_REQUEST, excepcionValidacion.getMessage(), excepcionValidacion.getErrores());
         }
@@ -76,6 +90,35 @@ public class ManejadorGlobalExcepciones implements ExceptionMapper<Throwable> {
     static String nombreCampo(String rutaPropiedad) {
         int indice = rutaPropiedad.lastIndexOf('.');
         return indice >= 0 ? rutaPropiedad.substring(indice + 1) : rutaPropiedad;
+    }
+
+    private static ErrorCampo errorDecimalInvalido(String campo) {
+        String detalle = campo.isEmpty()
+                ? "El valor debe ser un número válido"
+                : "El campo " + campo + " debe ser un número válido";
+        return new ErrorCampo(campo, detalle);
+    }
+
+    private static boolean contieneCausa(Throwable excepcion, Class<? extends Throwable> tipo) {
+        for (Throwable causa = excepcion; causa != null; causa = causa.getCause()) {
+            if (tipo.isInstance(causa)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Propiedad JSON que fallo segun el mensaje de JSON-B; cadena vacia si no se puede determinar. */
+    static String propiedadJsonInvalida(Throwable excepcion) {
+        for (Throwable causa = excepcion; causa != null; causa = causa.getCause()) {
+            if (causa instanceof JsonbException && causa.getMessage() != null) {
+                Matcher coincidencia = PROPIEDAD_YASSON.matcher(causa.getMessage());
+                if (coincidencia.find()) {
+                    return coincidencia.group(1);
+                }
+            }
+        }
+        return "";
     }
 
     private static Response construir(Response.Status estado, String mensaje, List<ErrorCampo> errores) {

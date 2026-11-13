@@ -103,4 +103,13 @@ public class PrecioControlador {
         precioServicio.eliminar(id);
         return Response.ok(RespuestaApi.<Void>exito(null, "Lista de precio eliminada correctamente")).build();
     }
+
+    /** Reactiva una lista eliminada: mismo permiso que el borrado logico (igual que sucursales). */
+    @PUT
+    @Path("/{id}/activar")
+    @RequierePermiso(recurso = RECURSO, accion = Accion.ELIMINAR)
+    public Response activar(@PathParam("id") Integer id) {
+        PrecioDTO activado = precioServicio.activar(id);
+        return Response.ok(RespuestaApi.exito(activado, "Lista de precio activada correctamente")).build();
+    }
 }

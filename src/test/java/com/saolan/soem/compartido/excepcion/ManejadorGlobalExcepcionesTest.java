@@ -2,6 +2,7 @@ package com.saolan.soem.compartido.excepcion;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -13,10 +14,15 @@ import org.junit.jupiter.api.Test;
 
 import com.saolan.soem.compartido.dto.ErrorCampo;
 import com.saolan.soem.compartido.dto.RespuestaApi;
+import com.saolan.soem.configuracion.dto.PrecioDTO;
 
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
+import jakarta.json.bind.JsonbException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
+import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
@@ -99,6 +105,33 @@ class ManejadorGlobalExcepcionesTest {
         Response respuesta = manejador.toResponse(new WebApplicationException("no autorizado", Response.Status.FORBIDDEN));
 
         assertEquals(403, respuesta.getStatus());
+    }
+
+    @Test
+    void toResponse_deberiaRetornar400ConElCampo_paraDecimalInvalidoEnElJson() throws Exception {
+        JsonbException errorLectura;
+        try (Jsonb jsonb = JsonbBuilder.create()) {
+            errorLectura = assertThrows(JsonbException.class,
+                    () -> jsonb.fromJson("{\"factor\":\"abc\"}", PrecioDTO.class));
+        }
+        // RESTEasy envuelve el error del lector del cuerpo; puede llegar como WebApplicationException.
+        Response respuesta = manejador.toResponse(new BadRequestException("Unable to deserialize", errorLectura));
+
+        assertEquals(400, respuesta.getStatus());
+        RespuestaApi<?> cuerpo = (RespuestaApi<?>) respuesta.getEntity();
+        assertEquals(1, cuerpo.errores().size());
+        assertEquals("factor", cuerpo.errores().get(0).campo());
+        assertEquals("El campo factor debe ser un número válido", cuerpo.errores().get(0).detalle());
+    }
+
+    @Test
+    void toResponse_deberiaRetornar400SinCampo_siJsonbNoInformaLaPropiedad() {
+        Response respuesta = manejador.toResponse(new RuntimeException(new ExcepcionDecimalInvalido()));
+
+        assertEquals(400, respuesta.getStatus());
+        ErrorCampo error = ((RespuestaApi<?>) respuesta.getEntity()).errores().get(0);
+        assertEquals("", error.campo());
+        assertEquals("El valor debe ser un número válido", error.detalle());
     }
 
     @Test

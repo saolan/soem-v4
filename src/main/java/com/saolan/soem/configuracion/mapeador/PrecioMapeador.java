@@ -16,11 +16,14 @@ import com.saolan.soem.configuracion.modelo.Precio;
  * lista, porque ya decidio si se generaron sus precios. MapStruct convierte
  * {@code alcanc} entre el texto del DTO y {@code AlcancePrecio} por el
  * nombre de la constante; el DTO ya llega validado contra esos nombres.
+ * {@code estado} es de solo lectura en la API: se ignora en ambas
+ * escrituras y lo gestiona {@code PrecioServicio} (alta, eliminar, activar).
  */
 @Mapper(componentModel = "cdi")
 public interface PrecioMapeador {
 
     @Mapping(target = "precioId", ignore = true)
+    @Mapping(target = "estado", ignore = true)
     Precio aPrecio(PrecioDTO precioDTO);
 
     PrecioDTO aPrecioDTO(Precio precio);
@@ -28,5 +31,6 @@ public interface PrecioMapeador {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "precioId", ignore = true)
     @Mapping(target = "alcanc", ignore = true)
+    @Mapping(target = "estado", ignore = true)
     void actualizarEntidadDesdeDto(PrecioDTO precioDTO, @MappingTarget Precio precio);
 }
