@@ -107,6 +107,20 @@ class SucursalRepositorioIT {
     }
 
     @Test
+    void buscarPorCodigoYDescri_deberianIgnorarMayusculas_yRespetarExclusion() {
+        Sucursal nueva = nuevaSucursal(codigoAleatorio(), rucAleatorio(), false);
+        nueva.setDescri("Sucursal " + codigoAleatorio());
+        Sucursal sucursal = crear(nueva);
+        String codigo = sucursal.getCodigo().toLowerCase(Locale.ROOT);
+        String descri = sucursal.getDescri().toUpperCase(Locale.ROOT);
+
+        assertTrue(sucursalRepositorio.buscarPorCodigo(codigo, null).isPresent());
+        assertTrue(sucursalRepositorio.buscarPorCodigo(codigo, sucursal.getSucursalId()).isEmpty());
+        assertTrue(sucursalRepositorio.buscarPorDescri(descri, null).isPresent());
+        assertTrue(sucursalRepositorio.buscarPorDescri(descri, sucursal.getSucursalId()).isEmpty());
+    }
+
+    @Test
     void buscarPorRuc_deberiaEncontrarYExcluirIdIndicado() {
         String ruc = rucAleatorio();
         Sucursal sucursal = crear(nuevaSucursal(codigoAleatorio(), ruc, false));

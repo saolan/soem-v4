@@ -363,8 +363,10 @@ class PrecioControladorIT {
     private Integer crearSucursal() {
         long numero = Math.abs(UUID.randomUUID().getLeastSignificantBits()) % 10_000_000_000L;
         String ruc = String.format(Locale.ROOT, "%013d", numero);
-        SucursalDTO sucursalDTO = new SucursalDTO(null, "PR" + UUID.randomUUID().toString().substring(0, 8), false,
-                "Sucursal de prueba precios", ruc, "Razón Social de Prueba", null, "Ambato",
+        // La descripcion de la sucursal debe ser unica: se deriva del codigo aleatorio.
+        String codigo = "PR" + UUID.randomUUID().toString().substring(0, 8);
+        SucursalDTO sucursalDTO = new SucursalDTO(null, codigo, false,
+                "Sucursal de prueba precios " + codigo, ruc, "Razón Social de Prueba", null, "Ambato",
                 "Av. de Prueba 123", "Av. de Prueba 123", "0999999999", null, "prueba@test.com",
                 "Representante de Prueba", "0999999999", "Dirección Representante de Prueba", ruc, null, null, null, true);
 

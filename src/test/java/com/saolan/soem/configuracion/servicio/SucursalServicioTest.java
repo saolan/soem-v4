@@ -124,6 +124,32 @@ class SucursalServicioTest {
     }
 
     @Test
+    void crear_deberiaLanzarConflicto_cuandoDescriDuplicada() {
+        SucursalDTO dto = crearSucursalDTO(null, "S001", "1234567890001", false);
+        when(sucursalRepositorio.buscarPorCodigo("S001", null)).thenReturn(Optional.empty());
+        when(sucursalRepositorio.buscarPorDescri("Sucursal Test", null)).thenReturn(Optional.of(new Sucursal()));
+        when(sucursalRepositorio.buscarPorRuc("1234567890001", null)).thenReturn(Optional.empty());
+
+        ExcepcionConflicto excepcion = assertThrows(ExcepcionConflicto.class, () -> sucursalServicio.crear(dto));
+
+        assertEquals(1, excepcion.getErrores().size());
+        assertEquals("descri", excepcion.getErrores().get(0).campo());
+        verify(sucursalRepositorio, never()).crear(any());
+    }
+
+    @Test
+    void crear_deberiaValidarYGuardarCodigoYDescriSinEspaciosExtremos() {
+        SucursalDTO dto = crearSucursalDTO(null, "  S001 ", "  Sucursal Norte ", "1234567890001", false, true);
+
+        SucursalDTO resultado = sucursalServicio.crear(dto);
+
+        verify(sucursalRepositorio).buscarPorCodigo("S001", null);
+        verify(sucursalRepositorio).buscarPorDescri("Sucursal Norte", null);
+        assertEquals("S001", resultado.codigo());
+        assertEquals("Sucursal Norte", resultado.descri());
+    }
+
+    @Test
     void crear_deberiaLanzarConflictoConDosErrores_cuandoCodigoYRucDuplicados() {
         SucursalDTO dto = crearSucursalDTO(null, "S001", "1234567890001", false);
         when(sucursalRepositorio.buscarPorCodigo("S001", null)).thenReturn(Optional.of(new Sucursal()));
@@ -144,6 +170,7 @@ class SucursalServicioTest {
 
         assertTrue(resultado.matriz());
         verify(sucursalRepositorio).buscarPorCodigo("S001", null);
+        verify(sucursalRepositorio).buscarPorDescri("Sucursal Test", null);
         verify(sucursalRepositorio).buscarPorRuc("1234567890001", null);
         verify(sucursalRepositorio).crear(any(Sucursal.class));
         verifyNoMoreInteractions(sucursalRepositorio);
@@ -186,6 +213,34 @@ class SucursalServicioTest {
     }
 
     @Test
+    void modificar_deberiaLanzarConflicto_cuandoDescriPerteneceAOtraSucursal() {
+        Sucursal existente = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
+        SucursalDTO dto = crearSucursalDTO(1, "S001", "1234567890001", false);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(existente));
+        when(sucursalRepositorio.buscarPorCodigo("S001", 1)).thenReturn(Optional.empty());
+        when(sucursalRepositorio.buscarPorDescri("Sucursal Test", 1)).thenReturn(Optional.of(crearSucursalEntidad(2, "S002", "otro", false, true)));
+        when(sucursalRepositorio.buscarPorRuc("1234567890001", 1)).thenReturn(Optional.empty());
+
+        ExcepcionConflicto excepcion = assertThrows(ExcepcionConflicto.class, () -> sucursalServicio.modificar(1, dto));
+
+        assertEquals("descri", excepcion.getErrores().get(0).campo());
+    }
+
+    @Test
+    void modificar_deberiaGuardarCodigoYDescriSinEspaciosExtremos() {
+        Sucursal existente = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
+        SucursalDTO dto = crearSucursalDTO(1, " S002  ", " Sucursal Sur ", "1234567890001", false, true);
+        when(sucursalRepositorio.buscarPorId(1)).thenReturn(Optional.of(existente));
+
+        sucursalServicio.modificar(1, dto);
+
+        verify(sucursalRepositorio).buscarPorCodigo("S002", 1);
+        verify(sucursalRepositorio).buscarPorDescri("Sucursal Sur", 1);
+        assertEquals("S002", existente.getCodigo());
+        assertEquals("Sucursal Sur", existente.getDescri());
+    }
+
+    @Test
     void modificar_deberiaConservarOtrasMatrices_cuandoPasaASerMatriz() {
         Sucursal existente = crearSucursalEntidad(1, "S001", "1234567890001", false, true);
         SucursalDTO dto = crearSucursalDTO(1, "S001", "1234567890001", true);
@@ -198,6 +253,7 @@ class SucursalServicioTest {
         assertTrue(existente.getMatriz());
         verify(sucursalRepositorio).buscarPorId(1);
         verify(sucursalRepositorio).buscarPorCodigo("S001", 1);
+        verify(sucursalRepositorio).buscarPorDescri("Sucursal Test", 1);
         verify(sucursalRepositorio).buscarPorRuc("1234567890001", 1);
         verifyNoMoreInteractions(sucursalRepositorio);
     }
@@ -633,7 +689,12 @@ class SucursalServicioTest {
     }
 
     private SucursalDTO crearSucursalDTO(Integer sucursalId, String codigo, String ruc, boolean matriz, Boolean estado) {
-        return new SucursalDTO(sucursalId, codigo, matriz, "Sucursal Test", ruc, "Razón Social Test",
+        return crearSucursalDTO(sucursalId, codigo, "Sucursal Test", ruc, matriz, estado);
+    }
+
+    private SucursalDTO crearSucursalDTO(Integer sucursalId, String codigo, String descri, String ruc, boolean matriz,
+            Boolean estado) {
+        return new SucursalDTO(sucursalId, codigo, matriz, descri, ruc, "Razón Social Test",
                 null, "Quito", "Av. de Prueba 123", "Av. de Prueba 123", "0999999999", null,
                 "correo@test.com", "Representante Test", "0999999999", "Dirección Representante Test",
                 ruc, null, null, null, estado);
