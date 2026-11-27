@@ -36,8 +36,8 @@ import jakarta.transaction.Transactional;
 
 /**
  * Reglas de negocio del agregado {@link Sucursal}: unicidad de
- * {@code codigo}/{@code ruc} (restricciones documentadas en el DDL pero no
- * declaradas en la base de datos), {@code estado} gestionado solo por
+ * {@code codigo}/{@code descri} (sin distinguir mayusculas ni espacios en los
+ * extremos) y de {@code ruc}, {@code estado} gestionado solo por
  * {@link #eliminar(Integer)} y {@link #activar(Integer)} (nunca desde el
  * DTO, para que {@code modificar} no equivalga a {@code eliminar}) y las
  * composiciones con {@link SucuCertEmis} (1:1), {@link SucuBode} (1:N) y
@@ -88,9 +88,12 @@ public class SucursalServicio {
 
     @Transactional
     public SucursalDTO crear(SucursalDTO sucursalDTO) {
-        validarUnicidad(sucursalDTO.codigo(), sucursalDTO.ruc(), null);
+        String codigo = sucursalDTO.codigo().strip();
+        String descri = sucursalDTO.descri().strip();
+        validarUnicidad(codigo, descri, sucursalDTO.ruc(), null);
 
         Sucursal sucursal = sucursalMapeador.aSucursal(sucursalDTO);
+        asignarIdentificadores(sucursal, codigo, descri);
         sucursal.setEstado(Boolean.TRUE);
         sucursalRepositorio.crear(sucursal);
         return sucursalMapeador.aSucursalDTO(sucursal);
@@ -99,9 +102,12 @@ public class SucursalServicio {
     @Transactional
     public SucursalDTO modificar(Integer sucursalId, SucursalDTO sucursalDTO) {
         Sucursal sucursal = obtenerOFallar(sucursalId);
-        validarUnicidad(sucursalDTO.codigo(), sucursalDTO.ruc(), sucursalId);
+        String codigo = sucursalDTO.codigo().strip();
+        String descri = sucursalDTO.descri().strip();
+        validarUnicidad(codigo, descri, sucursalDTO.ruc(), sucursalId);
 
         sucursalMapeador.actualizarEntidadDesdeDto(sucursalDTO, sucursal);
+        asignarIdentificadores(sucursal, codigo, descri);
         return sucursalMapeador.aSucursalDTO(sucursal);
     }
 
@@ -124,10 +130,20 @@ public class SucursalServicio {
                 .orElseThrow(() -> new ExcepcionNoEncontrado("No se encontró la sucursal solicitada"));
     }
 
-    private void validarUnicidad(String codigo, String ruc, Integer idExcluido) {
+    /** El codigo y la descripcion se comparan y guardan sin espacios en los extremos. */
+    private void asignarIdentificadores(Sucursal sucursal, String codigo, String descri) {
+        sucursal.setCodigo(codigo);
+        sucursal.setDescri(descri);
+    }
+
+    /** Codigo y descripcion se comparan sin distinguir mayusculas; el RUC, exacto. */
+    private void validarUnicidad(String codigo, String descri, String ruc, Integer idExcluido) {
         List<ErrorCampo> errores = new ArrayList<>();
         if (sucursalRepositorio.buscarPorCodigo(codigo, idExcluido).isPresent()) {
             errores.add(new ErrorCampo("codigo", "Ya existe una sucursal con este código"));
+        }
+        if (sucursalRepositorio.buscarPorDescri(descri, idExcluido).isPresent()) {
+            errores.add(new ErrorCampo("descri", "Ya existe una sucursal con esta descripción"));
         }
         if (sucursalRepositorio.buscarPorRuc(ruc, idExcluido).isPresent()) {
             errores.add(new ErrorCampo("ruc", "Ya existe una sucursal con este RUC"));

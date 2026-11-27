@@ -31,7 +31,7 @@ import jakarta.persistence.criteria.Root;
  * Acceso a datos de {@link Sucursal} mediante Criteria API: busqueda
  * paginada/filtrada, combo de solo lectura y las consultas auxiliares que
  * necesita {@code SucursalServicio} para sus reglas de negocio (unicidad de
- * codigo/ruc).
+ * codigo/descri sin distinguir mayusculas y de ruc).
  */
 @ApplicationScoped
 public class SucursalRepositorio {
@@ -51,19 +51,17 @@ public class SucursalRepositorio {
         entityManager.persist(sucursal);
     }
 
+    /** Otra sucursal con el mismo codigo (sin distinguir mayusculas), excluyendo opcionalmente la que se modifica. */
     public Optional<Sucursal> buscarPorCodigo(String codigo, Integer idExcluido) {
-        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Sucursal> query = criteriaBuilder.createQuery(Sucursal.class);
-        Root<Sucursal> raiz = query.from(Sucursal.class);
-
-        List<Predicate> predicados = new ArrayList<>();
-        predicados.add(criteriaBuilder.equal(raiz.get("codigo"), codigo));
-        agregarExclusionId(criteriaBuilder, raiz, idExcluido, predicados);
-
-        query.where(predicados.toArray(new Predicate[0]));
-        return entityManager.createQuery(query).setMaxResults(1).getResultStream().findFirst();
+        return buscarPorCampoSinMayusculas("codigo", codigo, idExcluido);
     }
 
+    /** Otra sucursal con la misma descripcion (sin distinguir mayusculas), excluyendo opcionalmente la que se modifica. */
+    public Optional<Sucursal> buscarPorDescri(String descri, Integer idExcluido) {
+        return buscarPorCampoSinMayusculas("descri", descri, idExcluido);
+    }
+
+    /** Comparacion exacta: el RUC solo admite digitos, ignorar mayusculas no aporta. */
     public Optional<Sucursal> buscarPorRuc(String ruc, Integer idExcluido) {
         CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
         CriteriaQuery<Sucursal> query = criteriaBuilder.createQuery(Sucursal.class);
@@ -155,6 +153,24 @@ public class SucursalRepositorio {
         query.orderBy(criteriaBuilder.asc(precio.get("descri")));
 
         return entityManager.createQuery(query).getResultList();
+    }
+
+    /**
+     * {@code campo} es siempre una constante interna de esta clase, nunca un
+     * dato del cliente; el valor viaja como parametro de la consulta.
+     */
+    private Optional<Sucursal> buscarPorCampoSinMayusculas(String campo, String valor, Integer idExcluido) {
+        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Sucursal> query = criteriaBuilder.createQuery(Sucursal.class);
+        Root<Sucursal> raiz = query.from(Sucursal.class);
+
+        List<Predicate> predicados = new ArrayList<>();
+        predicados.add(criteriaBuilder.equal(criteriaBuilder.lower(raiz.get(campo)),
+                valor.toLowerCase(Locale.ROOT)));
+        agregarExclusionId(criteriaBuilder, raiz, idExcluido, predicados);
+
+        query.where(predicados.toArray(new Predicate[0]));
+        return entityManager.createQuery(query).setMaxResults(1).getResultStream().findFirst();
     }
 
     private void agregarExclusionId(CriteriaBuilder criteriaBuilder, Root<Sucursal> raiz, Integer idExcluido,
