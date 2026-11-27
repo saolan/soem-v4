@@ -176,6 +176,23 @@ class SucursalControladorIT {
     }
 
     @Test
+    void crear_conCodigoODescriDuplicadosEnOtrasMayusculas_deberiaRetornar409() {
+        String codigo = codigoAleatorio();
+        String descri = "Sucursal " + codigo;
+        Response respuestaPrimera = crear(sucursalDTO(null, codigo, rucAleatorio(), false));
+        assertEquals(201, respuestaPrimera.getStatus());
+        registrarParaLimpieza(respuestaPrimera);
+
+        Response mismoCodigo = crear(sucursalDTO(null, codigo.toLowerCase(Locale.ROOT), "Otra " + codigoAleatorio(),
+                rucAleatorio(), false, true));
+        Response mismaDescri = crear(sucursalDTO(null, codigoAleatorio(), " " + descri.toUpperCase(Locale.ROOT) + " ",
+                rucAleatorio(), false, true));
+
+        assertEquals(409, mismoCodigo.getStatus());
+        assertEquals(409, mismaDescri.getStatus());
+    }
+
+    @Test
     void modificar_deberiaActualizarDatos() {
         Response respuestaCrear = crear(sucursalDTO(null, codigoAleatorio(), rucAleatorio(), false));
         Integer id = registrarParaLimpieza(respuestaCrear);
@@ -316,8 +333,14 @@ class SucursalControladorIT {
         return sucursalDTO(sucursalId, codigo, ruc, matriz, true);
     }
 
+    /** La descripcion se deriva del codigo para que sea unica, como exige SucursalServicio. */
     private SucursalDTO sucursalDTO(Integer sucursalId, String codigo, String ruc, boolean matriz, Boolean estado) {
-        return new SucursalDTO(sucursalId, codigo, matriz, "Sucursal de prueba", ruc, "Razón Social de Prueba",
+        return sucursalDTO(sucursalId, codigo, "Sucursal " + codigo, ruc, matriz, estado);
+    }
+
+    private SucursalDTO sucursalDTO(Integer sucursalId, String codigo, String descri, String ruc, boolean matriz,
+            Boolean estado) {
+        return new SucursalDTO(sucursalId, codigo, matriz, descri, ruc, "Razón Social de Prueba",
                 null, "Quito", "Av. de Prueba 123", "Av. de Prueba 123", "0999999999", null,
                 "prueba@test.com", "Representante de Prueba", "0999999999", "Dirección Representante de Prueba",
                 ruc, null, null, null, estado);
