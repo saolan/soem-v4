@@ -148,7 +148,7 @@ class CertEmisRepositorioIT {
         sucursal.setRuc(ruc);
         sucursal.setMatriz(Boolean.FALSE);
         sucursal.setEstado(Boolean.TRUE);
-        sucursal.setDescri("Sucursal de prueba certificado emisor");
+        sucursal.setDescri("Sucursal de prueba certificado emisor " + sucursal.getCodigo()); // unica: V11 (lower(descri))
         sucursal.setRazonSoci("Razón Social de Prueba");
         sucursal.setCiudad("Ambato");
         sucursal.setDirecc("Av. de Prueba 123");

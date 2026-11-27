@@ -199,7 +199,7 @@ class SucursalRepositorioIT {
         sucursal.setRuc(ruc);
         sucursal.setMatriz(matriz);
         sucursal.setEstado(Boolean.TRUE);
-        sucursal.setDescri("Sucursal de prueba");
+        sucursal.setDescri("Sucursal de prueba " + sucursal.getCodigo()); // unica: V11 (lower(descri))
         sucursal.setRazonSoci("Razón Social de Prueba");
         sucursal.setCiudad("Quito");
         sucursal.setDirecc("Av. de Prueba 123");
