@@ -157,7 +157,7 @@ class BodegaRepositorioIT {
         sucursal.setRuc(ruc);
         sucursal.setMatriz(Boolean.FALSE);
         sucursal.setEstado(Boolean.TRUE);
-        sucursal.setDescri("Sucursal de prueba bodegas");
+        sucursal.setDescri("Sucursal de prueba bodegas " + sucursal.getCodigo()); // unica: V11 (lower(descri))
         sucursal.setRazonSoci("Razón Social de Prueba");
         sucursal.setCiudad("Ambato");
         sucursal.setDirecc("Av. de Prueba 123");
